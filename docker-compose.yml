@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  mplink_postgres:
+    image: postgres:16
+    container_name: mplink_marketplace_db
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mplink_pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mplink_net
+
+volumes:
+  mplink_pgdata:
+
+networks:
+  mplink_net:
+    driver: bridge
