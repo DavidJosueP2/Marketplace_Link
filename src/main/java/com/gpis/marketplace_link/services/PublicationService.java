@@ -1,4 +1,7 @@
 package com.gpis.marketplace_link.services;
 
-public class ProductService {
+import org.springframework.stereotype.Service;
+
+@Service
+public class PublicationService {
 }
