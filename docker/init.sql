@@ -113,12 +113,6 @@ CREATE TABLE IF NOT EXISTS categories (
                                           name VARCHAR(255) NOT NULL
     );
 
--- ======================
--- Tabla: vendors
--- ======================
-CREATE TABLE IF NOT EXISTS vendors (
-                                       id BIGSERIAL PRIMARY KEY
-);
 
 -- ======================
 -- Tabla: publications
@@ -133,7 +127,7 @@ CREATE TABLE IF NOT EXISTS publications (
     availability VARCHAR(20) NOT NULL  DEFAULT 'AVAILABLE', -- AVAILABLE, NOT_AVAILABLE
     status VARCHAR(20) NOT NULL DEFAULT 'VISIBLE', -- VISIBLE,  UNDER_REVIEW , BLOCKED,
     publication_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    location geography(Point, 4326), --WGS 84 Empleado para sistemas GPS
+    location geography(Point, 4326), --WGS 84 empleado para sistemas GPS
     category_id BIGINT,
     vendor_id BIGINT, -- referencia al vendedor, de momento sin llave foranea
     deleted_at TIMESTAMP,
