@@ -128,8 +128,8 @@ CREATE TABLE IF NOT EXISTS publications (
     status VARCHAR(20) NOT NULL DEFAULT 'VISIBLE', -- VISIBLE,  UNDER_REVIEW , BLOCKED,
     publication_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     location geography(Point, 4326), --WGS 84 empleado para sistemas GPS
-    category_id BIGINT,
-    vendor_id BIGINT, -- referencia al vendedor, de momento sin llave foranea
+    category_id BIGINT NOT NULL,
+    vendor_id BIGINT NOT NULL,
     deleted_at TIMESTAMP,
     suspended BOOLEAN DEFAULT FALSE,
     working_hours VARCHAR(255),
@@ -137,8 +137,11 @@ CREATE TABLE IF NOT EXISTS publications (
     CONSTRAINT fk_publications_category
     FOREIGN KEY (category_id)
     REFERENCES categories(id),
-    -- CONSTRAINT fk_publications_vendor FOREIGN KEY (vendor_id)
-    --     REFERENCES vendors(id)
+
+    CONSTRAINT fk_publications_vendor
+    FOREIGN KEY (vendor_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE
     );
 
 -- ======================

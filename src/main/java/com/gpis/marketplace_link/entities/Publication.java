@@ -58,6 +58,9 @@ public class Publication {
 
     private String workingHours;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vendor_id", nullable = false)
+    private User vendor;
 
     @OneToMany(mappedBy = "publication", cascade = CascadeType.ALL)
     private List<PublicationImage> images;
