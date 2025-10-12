@@ -1,18 +1,15 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:postgresql://${DB_HOST_TEST:localhost}:${DB_PORT_TEST:5437}/${DB_NAME_TEST:marketplace_test_db}
+    username: ${DB_USER_TEST:postgres}
+    password: ${DB_PASSWORD_TEST:admin}
+    driver-class-name: org.postgresql.Driver
+
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: update
-    database-platform: org.hibernate.dialect.H2Dialect
+      ddl-auto: create-drop
+    database-platform: org.hibernate.spatial.dialect.postgis.PostgisPG95Dialect
     properties:
       hibernate:
         format_sql: true
