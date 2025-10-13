@@ -36,21 +36,23 @@ public class PublicationService {
                 .and(PublicationSpecifications.priceBetween(minPrice, maxPrice))
                 .and(PublicationSpecifications.withinDistance(lat, lon, distanceKm));
 
-        Page<Publication> publications = repository.findAll(spec, pageable);
+//        Page<Publication> publications = repository.findAll(spec, pageable);
+//
+//        return publications.map(pub -> {
+//            String city = null;
+//            String country = null;
+//            if (pub.getLocation() != null) {
+//                var locationInfoOpt = geocodingService.reverseGeocode(pub.getLocation().getY(), pub.getLocation().getX());
+//                if (locationInfoOpt.isPresent()) {
+//                    var locationInfo = locationInfoOpt.get();
+//                    city = locationInfo.city();
+//                    country = locationInfo.country();
+//                }
+//            }
+//            return mapper.toResponse(pub, city, country);
+//        });
 
-        return publications.map(pub -> {
-            String city = null;
-            String country = null;
-            if (pub.getLocation() != null) {
-                var locationInfoOpt = geocodingService.reverseGeocode(pub.getLocation().getY(), pub.getLocation().getX());
-                if (locationInfoOpt.isPresent()) {
-                    var locationInfo = locationInfoOpt.get();
-                    city = locationInfo.city();
-                    country = locationInfo.country();
-                }
-            }
-            return mapper.toResponse(pub, city, country);
-        });
+        return null;
     }
 
 }
