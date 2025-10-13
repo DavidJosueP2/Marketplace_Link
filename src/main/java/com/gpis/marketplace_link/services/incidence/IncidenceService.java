@@ -5,6 +5,8 @@ import com.gpis.marketplace_link.dto.incidence.RequestReportProduct;
 
 public interface IncidenceService {
 
+    void autoclose();
     ReportResponse report(RequestReportProduct req);
+
 
 }

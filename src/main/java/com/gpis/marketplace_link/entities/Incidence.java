@@ -11,7 +11,8 @@ import java.util.List;
 
 @Getter
 @Setter
-@Entity(name = "incidences")
+@Entity
+@Table(name = "incidences")
 public class Incidence {
 
     @Id
@@ -41,7 +42,7 @@ public class Incidence {
     @Enumerated(EnumType.STRING)
     private Decision decision; // por default es null
 
-    @OneToMany(mappedBy = "incidence", cascade = {CascadeType.PERSIST, CascadeType.REFRESH})
+    @OneToMany(mappedBy = "incidence", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Report> reports;
 
     @PrePersist()

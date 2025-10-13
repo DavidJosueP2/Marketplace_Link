@@ -11,7 +11,6 @@ public class ReportResponse {
 
     private Long incidenceId;
     private Long productId;
-    private Long reportId;
     private String message;
     private LocalDateTime createdAt;
 

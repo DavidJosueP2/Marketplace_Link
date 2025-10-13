@@ -16,7 +16,7 @@ public class RequestReportProduct {
     private Long publicationId;
 
     @NotNull(message = "Reported ID is required")
-    @JsonProperty("reported_id")
+    @JsonProperty("reporter_id")
     private Long reporterId;
 
     @Size(min = 10, max = 100, message = "Reason must be between 10 and 100 characters")

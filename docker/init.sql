@@ -163,14 +163,14 @@ CREATE TABLE IF NOT EXISTS publication_images (
 -- ======================
 -- Inserción de usuarios de prueba
 -- ======================
-
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender)
 VALUES
-    ('0101010101', 'admin_user', 'password123', 'admin@example.com', '0999000001', 'Admin', 'User', 'M'),
-    ('0202020202', 'moderator_user', 'password123', 'moderator@example.com', '0999000002', 'Moderator', 'User', 'F'),
-    ('0303030303', 'seller_one', 'password123', 'seller1@example.com', '0999000003', 'Seller', 'One', 'M'),
-    ('0404040404', 'seller_two', 'password123', 'seller2@example.com', '0999000004', 'Seller', 'Two', 'F'),
-    ('0505050505', 'buyer_user', 'password123', 'buyer@example.com', '0999000005', 'Buyer', 'User', 'M');
+    ('0101010101', 'admin_user', crypt('password123', gen_salt('bf')), 'admin@example.com', '0999000001', 'Admin', 'User', 'MALE'),
+    ('0202020202', 'moderator_user', crypt('password123', gen_salt('bf')), 'moderator@example.com', '0999000002', 'Moderator', 'User', 'FEMALE'),
+    ('0303030303', 'seller_one', crypt('password123', gen_salt('bf')), 'seller1@example.com', '0999000003', 'Seller', 'One', 'MALE'),
+    ('0404040404', 'seller_two', crypt('password123', gen_salt('bf')), 'seller2@example.com', '0999000004', 'Seller', 'Two', 'FEMALE'),
+    ('0505050505', 'buyer_user', crypt('password123', gen_salt('bf')), 'buyer@example.com', '0999000005', 'Buyer', 'User', 'MALE');
 
 -- ======================
 -- Asignación de roles a usuarios
@@ -228,7 +228,7 @@ INSERT INTO publication_images (publication_id, path) VALUES
 CREATE TABLE incidences (
                             id  BIGSERIAL PRIMARY KEY ,
                             publication_id BIGINT NOT NULL,
-                            status VARCHAR(20) CHECK (status IN ('OPEN','APPEALED','RESOLVED')) DEFAULT 'OPEN',
+                            status VARCHAR(20) CHECK (status IN ('OPEN', 'UNDER_REVIEW','APPEALED','RESOLVED')) DEFAULT 'OPEN',
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             last_report_at TIMESTAMP,
                             auto_closed BOOLEAN DEFAULT FALSE,

@@ -13,6 +13,7 @@ import com.gpis.marketplace_link.repository.PublicationRepository;
 import com.gpis.marketplace_link.repository.ReportRepository;
 import com.gpis.marketplace_link.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IncidenceServiceImp implements IncidenceService {
@@ -32,10 +34,19 @@ public class IncidenceServiceImp implements IncidenceService {
 
     @Transactional
     @Override
+    public void autoclose() {
+        int hours = 24;
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(hours);
+        int updated = incidenceRepository.bulkAutoClose(cutoff);
+        log.info("Incidencias auto-cerradas: {}", updated);
+    }
+
+    @Transactional
+    @Override
     public ReportResponse report(RequestReportProduct req) {
         // Datos para o crear la incidencia o agregar el reporte a la incidencia existente.
         Long publicationId = req.getPublicationId();
-        List<IncidenceStatus> status = List.of(IncidenceStatus.OPEN, IncidenceStatus.APPEALED);
+        List<IncidenceStatus> status = List.of(IncidenceStatus.OPEN, IncidenceStatus.UNDER_REVIEW, IncidenceStatus.APPEALED);
         Optional<Incidence> inc = incidenceRepository.findByPublicationIdAndStatusIn(publicationId, status);
 
         // No existe incidencia para ese producto, entonces crear la incidencia y el reporte.
@@ -44,12 +55,12 @@ public class IncidenceServiceImp implements IncidenceService {
             Publication savedPublication = publicationRepository.findById(publicationId).orElseThrow(() -> new PublicationNotFoundException("Publicacion no encontrada con id=" + publicationId));
             incidence.setPublication(savedPublication);
             Incidence savedIncidence = incidenceRepository.save(incidence);
+
             User reporter = userRepository.findById(req.getReporterId()).orElseThrow(() -> new ReporterNotFoundException("Reportador no encontrado con id=" + req.getReporterId()));
             Report report = createReportForIncidenceAndReporter(savedIncidence, reporter, req.getReason(), req.getComment());
             reportRepository.save(report);
 
             ReportResponse response = new ReportResponse();
-            response.setReportId(report.getId());
             response.setIncidenceId(savedIncidence.getId());
             response.setProductId(publicationId);
             response.setMessage("Reporte generado exitosamente.");
@@ -59,12 +70,10 @@ public class IncidenceServiceImp implements IncidenceService {
         } else {
             // Como existe la incidencia se considera casos como
             Incidence existingIncidence = inc.get();
-            Publication savedPublication = publicationRepository.findById(publicationId).orElseThrow(() -> new PublicationNotFoundException("Publicacion no encontrada con id=" + publicationId));
-            Long reportId = null;
 
             // El producto esta en revision, no se pueden agregar mas reportes.
-            if (savedPublication.getStatus().equals("UNDER_REVIEW")) {
-                throw new PublicationUnderReviewException("La publicacion ya esta en revision, no se pueden agregar mas reportes.");
+            if (existingIncidence.getStatus().equals(IncidenceStatus.UNDER_REVIEW)) {
+                throw new PublicationUnderReviewException("La incidencia esta en revision, no se pueden agregar mas reportes.");
             }
 
             // La incidencia esta apelada, no se pueden agregar mas reportes.
@@ -83,23 +92,24 @@ public class IncidenceServiceImp implements IncidenceService {
                 User reporter = userRepository.findById(req.getReporterId()).orElseThrow(() -> new ReporterNotFoundException("Reportador no encontrado con id=" + req.getReporterId()));
                 Report report = createReportForIncidenceAndReporter(existingIncidence, reporter, req.getReason(), req.getComment());
                 existingIncidence.getReports().add(report);
-                reportId = report.getId();
+                existingIncidence.setLastReportAt(LocalDateTime.now());
                 incidenceRepository.save(existingIncidence);
             }
 
             // Si la cantidad de reportes es mayor o igual a 3, se cambia el estado de la publicacion bajo revision.
             if (existingIncidence.getReports().size() >= REPORT_THRESHOLD) {
+                Publication savedPublication = publicationRepository.findById(publicationId).orElseThrow(() -> new PublicationNotFoundException("Publicacion no encontrada con id=" + publicationId));
+                existingIncidence.setStatus(IncidenceStatus.UNDER_REVIEW);
                 savedPublication.setUnderReview();
                 publicationRepository.save(savedPublication);
+                incidenceRepository.save(existingIncidence);
             }
 
             ReportResponse response = new ReportResponse();
             response.setIncidenceId(existingIncidence.getId());
             response.setProductId(publicationId);
-            response.setReportId(reportId);
             response.setMessage("Reporte agregado exitosamente.");
             response.setCreatedAt(LocalDateTime.now());
-
             return response;
         }
     }
