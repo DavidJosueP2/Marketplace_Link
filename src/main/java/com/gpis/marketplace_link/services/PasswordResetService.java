@@ -51,21 +51,25 @@ public class PasswordResetService {
 
     @Transactional
     public void forgotPassword(ForgotPasswordRequest req) {
-        userRepository.findByEmail(req.email()).ifPresent(user -> {
-            PasswordResetToken token = save(user.getId());
+        var user = userRepository.findByEmail(req.email())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "No se encontró un usuario con el email: " + req.email()
+                ));
 
-            SendEmailRequest mail = new SendEmailRequest();
-            mail.setEmailTo(req.email());
-            mail.setEmailType(EmailType.PASSWORD_RESET);
+        PasswordResetToken token = save(user.getId());
 
-            PasswordResetUrl url = new PasswordResetUrl(frontendUrl + "/reset-password", token.getToken());
-            Map<String, String> variables = Map.of(
-                    "user", user.getUsername(),
-                    "reset_url", url.toString()
-            );
+        SendEmailRequest mail = new SendEmailRequest();
+        mail.setEmailTo(req.email());
+        mail.setEmailType(EmailType.PASSWORD_RESET);
 
-            notificationService.send(mail.getEmailTo(), mail.getEmailType(), variables);
-        });
+        PasswordResetUrl url = new PasswordResetUrl(frontendUrl + "/reset-password", token.getToken());
+        Map<String, String> variables = Map.of(
+                "user", user.getUsername(),
+                "reset_url", url.toString()
+        );
+
+        notificationService.sendAsync(mail.getEmailTo(), mail.getEmailType(), variables);
     }
 
     @Transactional

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Confirma tu correo</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; }
+        h1 { color: #333; font-size: 20px; }
+        p { color: #555; margin: 8px 0; }
+        a.button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 15px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007BFF;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        a.button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Confirma tu correo</h1>
+    <p>Hola <strong>${user}</strong>,</p>
+    <p>Gracias por registrarte. Para activar tu cuenta, confirma tu correo haciendo clic aquí:</p>
+    <p><a class="button" href="${confirm_url}">Confirmar correo</a></p>
+    <p>El enlace expirará en 24 horas.</p>
+    <p>Si no creaste una cuenta, ignora este mensaje.</p>
+</div>
+</body>
+</html>

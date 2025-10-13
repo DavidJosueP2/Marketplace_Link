@@ -10,12 +10,12 @@ import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/auth/password-reset")
+@RequestMapping("/api/auth/password")
 public class PasswordResetController {
 
     private final PasswordResetService passwordResetService;
 
-    @PostMapping
+    @PostMapping("/forgot")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req){
         passwordResetService.forgotPassword(req);
         return ResponseEntity.noContent().build();
