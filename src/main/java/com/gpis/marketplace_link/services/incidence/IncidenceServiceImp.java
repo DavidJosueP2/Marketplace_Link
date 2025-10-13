@@ -1,5 +1,6 @@
 package com.gpis.marketplace_link.services.incidence;
 
+import com.gpis.marketplace_link.dto.incidence.ReportResponse;
 import com.gpis.marketplace_link.dto.incidence.RequestReportProduct;
 import com.gpis.marketplace_link.entities.Incidence;
 import com.gpis.marketplace_link.entities.Publication;
@@ -12,11 +13,14 @@ import com.gpis.marketplace_link.repository.PublicationRepository;
 import com.gpis.marketplace_link.repository.ReportRepository;
 import com.gpis.marketplace_link.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Service
 @RequiredArgsConstructor
 public class IncidenceServiceImp implements IncidenceService {
 
@@ -24,12 +28,11 @@ public class IncidenceServiceImp implements IncidenceService {
     private final PublicationRepository publicationRepository;
     private final UserRepository userRepository;
     private final ReportRepository reportRepository;
-
     private static final int REPORT_THRESHOLD = 3;
 
     @Transactional
     @Override
-    public void report(RequestReportProduct req) {
+    public ReportResponse report(RequestReportProduct req) {
         // Datos para o crear la incidencia o agregar el reporte a la incidencia existente.
         Long publicationId = req.getPublicationId();
         List<IncidenceStatus> status = List.of(IncidenceStatus.OPEN, IncidenceStatus.APPEALED);
@@ -44,10 +47,20 @@ public class IncidenceServiceImp implements IncidenceService {
             User reporter = userRepository.findById(req.getReporterId()).orElseThrow(() -> new ReporterNotFoundException("Reportador no encontrado con id=" + req.getReporterId()));
             Report report = createReportForIncidenceAndReporter(savedIncidence, reporter, req.getReason(), req.getComment());
             reportRepository.save(report);
+
+            ReportResponse response = new ReportResponse();
+            response.setReportId(report.getId());
+            response.setIncidenceId(savedIncidence.getId());
+            response.setProductId(publicationId);
+            response.setMessage("Reporte generado exitosamente.");
+            response.setCreatedAt(LocalDateTime.now());
+            return response;
+
         } else {
             // Como existe la incidencia se considera casos como
             Incidence existingIncidence = inc.get();
             Publication savedPublication = publicationRepository.findById(publicationId).orElseThrow(() -> new PublicationNotFoundException("Publicacion no encontrada con id=" + publicationId));
+            Long reportId = null;
 
             // El producto esta en revision, no se pueden agregar mas reportes.
             if (savedPublication.getStatus().equals("UNDER_REVIEW")) {
@@ -70,6 +83,7 @@ public class IncidenceServiceImp implements IncidenceService {
                 User reporter = userRepository.findById(req.getReporterId()).orElseThrow(() -> new ReporterNotFoundException("Reportador no encontrado con id=" + req.getReporterId()));
                 Report report = createReportForIncidenceAndReporter(existingIncidence, reporter, req.getReason(), req.getComment());
                 existingIncidence.getReports().add(report);
+                reportId = report.getId();
                 incidenceRepository.save(existingIncidence);
             }
 
@@ -78,6 +92,15 @@ public class IncidenceServiceImp implements IncidenceService {
                 savedPublication.setUnderReview();
                 publicationRepository.save(savedPublication);
             }
+
+            ReportResponse response = new ReportResponse();
+            response.setIncidenceId(existingIncidence.getId());
+            response.setProductId(publicationId);
+            response.setReportId(reportId);
+            response.setMessage("Reporte agregado exitosamente.");
+            response.setCreatedAt(LocalDateTime.now());
+
+            return response;
         }
     }
 
