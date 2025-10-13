@@ -2,6 +2,7 @@
 --  Creación de tablas base para Marketplace_Link
 --  Compatible con PostgreSQL 16
 -- =========================================================
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ======================
 -- Tabla: roles
@@ -14,25 +15,26 @@ CREATE TABLE IF NOT EXISTS roles (
 -- ======================
 -- Tabla: users
 -- ======================
-CREATE TABLE IF NOT EXISTS users (
-    id BIGSERIAL PRIMARY KEY,
-    cedula VARCHAR(10) UNIQUE NOT NULL,
-    username VARCHAR(100) NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    gender VARCHAR(10),
-    account_status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted BOOLEAN DEFAULT FALSE,
+CREATE TABLE users (
+    id               BIGSERIAL PRIMARY KEY,
+    cedula           VARCHAR(10)  NOT NULL,
+    username         VARCHAR(100) NOT NULL,
+    password         VARCHAR(255) NOT NULL,
+    email            VARCHAR(255) NOT NULL,
+    phone            VARCHAR(20)  NOT NULL,
+    first_name       VARCHAR(100) NOT NULL,
+    last_name        VARCHAR(100) NOT NULL,
+    gender           VARCHAR(10),
+    account_status   VARCHAR(30)  NOT NULL DEFAULT 'PENDING_VERIFICATION',
+    email_verified_at TIMESTAMP NULL,
+    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted          BOOLEAN      NOT NULL DEFAULT FALSE,
 
     CONSTRAINT uk_user_username UNIQUE (username),
-    CONSTRAINT uk_user_email UNIQUE (email),
-    CONSTRAINT uk_user_phone UNIQUE (phone),
-    CONSTRAINT uk_user_cedula UNIQUE (cedula)
+    CONSTRAINT uk_user_email    UNIQUE (email),
+    CONSTRAINT uk_user_phone    UNIQUE (phone),
+    CONSTRAINT uk_user_cedula   UNIQUE (cedula)
 );
 
 -- ======================
@@ -73,6 +75,22 @@ CREATE TABLE IF NOT EXISTS password_reset_token (
 );
 
 -- ======================
+-- Tabla: email_verification_tokens
+-- ======================
+CREATE TABLE email_verification_tokens (
+                                           id          BIGSERIAL PRIMARY KEY,
+                                           user_id     BIGINT       NOT NULL,
+                                           token       VARCHAR(100) NOT NULL UNIQUE,
+                                           expires_at  TIMESTAMP    NOT NULL,
+                                           consumed_at TIMESTAMP,
+                                           CONSTRAINT fk_email_verif_user
+                                               FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_email_verif_user   ON email_verification_tokens(user_id);
+CREATE INDEX idx_email_verif_expiry ON email_verification_tokens(expires_at);
+
+-- ======================
 -- Datos iniciales
 -- ======================
 INSERT INTO roles (name) VALUES
@@ -81,6 +99,27 @@ INSERT INTO roles (name) VALUES
                              ('ROLE_SELLER'),
                              ('ROLE_BUYER')
 ON CONFLICT (name) DO NOTHING;
+
+-- Usuario admin por defecto
+INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at)
+VALUES (
+           '0000000000',
+           'admin',
+           crypt('admin123', gen_salt('bf',12)),
+           'admin@example.com',
+           '+593000000000',
+           'Admin',
+           'Root',
+           'MALE',
+           'ACTIVE',
+           NOW()
+       )
+ON CONFLICT (username) DO NOTHING;
+
+-- Asignar rol ADMIN al usuario admin
+INSERT INTO users_roles (user_id, role_id)
+SELECT u.id, r.id FROM users u JOIN roles r ON r.name='ROLE_ADMIN' WHERE u.username='admin'
+ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- ======================
 -- Trigger para updated_at
