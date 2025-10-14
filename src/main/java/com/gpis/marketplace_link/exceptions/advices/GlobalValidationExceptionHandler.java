@@ -3,7 +3,6 @@ package com.gpis.marketplace_link.exceptions.advices;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.gpis.marketplace_link.exceptions.business.BusinessException;
 import jakarta.validation.ConstraintViolationException;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
