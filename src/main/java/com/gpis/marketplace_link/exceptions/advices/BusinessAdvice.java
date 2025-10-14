@@ -67,7 +67,7 @@ public class BusinessAdvice {
     }
 
     // --- usuarios ---
-    @ExceptionHandler(PublicationUnderReviewException.class)
+    @ExceptionHandler(ModeratorNotFoundException.class)
     public ProblemDetail handleModeratorNotFound(ModeratorNotFoundException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         pd.setTitle("Moderator Not Found");
