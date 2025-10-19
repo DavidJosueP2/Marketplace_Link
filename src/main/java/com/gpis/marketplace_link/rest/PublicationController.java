@@ -55,6 +55,21 @@ public class PublicationController {
 
     }
 
+    @GetMapping("/by-vendor")
+    public ResponseEntity<Page<PublicationSummaryResponse>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long categoryId,
+          @RequestParam Long vendorId
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<PublicationSummaryResponse> response = service.getAllByVendor(
+                pageable,categoryId,vendorId
+        );
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<PublicationResponse> create(@Valid @ModelAttribute PublicationCreateRequest request){
         PublicationResponse response = service.create(request);

@@ -73,6 +73,25 @@ public class PublicationService {
         return publications.map(mapper::toSummaryResponse);
     }
 
+    @Transactional(readOnly = true)
+    public Page<PublicationSummaryResponse> getAllByVendor(Pageable pageable, Long categoryId,Long vendorId) {
+
+        this.validateUserAndRole(vendorId);
+
+        Specification<Publication> spec =
+                        PublicationSpecifications.vendorIs(vendorId)
+                                .and( PublicationSpecifications.statusIs(PublicationStatus.VISIBLE.getValue()))
+                        .and(PublicationSpecifications.notDeleted())
+                        .and(PublicationSpecifications.notSuspended())
+                        .and(PublicationSpecifications.hasCategory(categoryId));
+
+        Page<Publication> publications = repository.findAll(spec, pageable);
+
+        return publications.map(mapper::toSummaryResponse);
+    }
+
+
+
     public PublicationResponse getById(Long id) {
 
         Publication publication = this.validatePublication(id);
@@ -81,10 +100,14 @@ public class PublicationService {
 
     }
 
+
+
+
+
     @Transactional(noRollbackFor = DangerousContentException.class)
     public PublicationResponse create(PublicationCreateRequest request) {
 
-        validateUserRole(request.vendorId());
+        validateUserAndRole(request.vendorId());
 
         imageValidationService.validateImages(request.images());
 
@@ -121,7 +144,7 @@ public class PublicationService {
     public PublicationResponse update(Long id, PublicationUpdateRequest request) {
 
 
-        validateUserRole(request.vendorId());
+        validateUserAndRole(request.vendorId());
 
         Publication publication = this.validatePublication(id);
 
@@ -164,6 +187,8 @@ public class PublicationService {
         return mapper.toResponse(saved);
 
     }
+
+
 
 
     public Publication validatePublication(Long id) {
@@ -216,7 +241,7 @@ public class PublicationService {
         incidenceService.reportBySystem(requestSystemReport);
     }
 
-    private void validateUserRole(Long id) {
+    private void validateUserAndRole(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
