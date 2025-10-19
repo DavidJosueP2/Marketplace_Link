@@ -119,11 +119,6 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     }
 
     /**
-     * Método ejecutado cuando la autenticación falla.
-     *
-     * Devuelve una respuesta JSON con un mensaje de error y el detalle
-     * de la excepción, junto con un código de estado HTTP 401 (Unauthorized).
-     *
      * @param request  petición original
      * @param response respuesta HTTP donde se envía el mensaje de error
      * @param failed   excepción lanzada por la autenticación fallida
@@ -132,12 +127,19 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     protected void unsuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response,
                                               AuthenticationException failed) throws IOException, ServletException {
         Map<String, String> body = new HashMap<>();
-        body.put("message", "Email or password invalid.");
+        String message = "Email o contraseña inválidos.";
+
+        if (failed instanceof org.springframework.security.authentication.LockedException) {
+            message = "Tu cuenta está bloqueada. Contacta al administrador.";
+        } else if (failed instanceof org.springframework.security.authentication.DisabledException) {
+            message = "Tu cuenta está pendiente de verificación. Revisa tu correo.";
+        }
+
+        body.put("message", message);
         body.put("error", failed.getMessage());
 
-        response.getWriter().write(new ObjectMapper().writeValueAsString(body));
-        response.setStatus(401);
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(CONTENT_TYPE);
+        response.getWriter().write(new ObjectMapper().writeValueAsString(body));
     }
-
 }

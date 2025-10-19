@@ -44,7 +44,7 @@ public class ProdSecurityConfig {
             "/login",
             "/api/users/**",
             "/api/auth/password/**",
-            "/api/auth/resend-verification",
+            "/api/auth/resend-verification", "/api/auth/verify-email/resend",
             "/error",
     };
 

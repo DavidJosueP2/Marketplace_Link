@@ -29,7 +29,7 @@ public record UserCreateRequest(
 
         @NotBlank(message = "El teléfono es obligatorio")
         @Size(max = 20, message = "El teléfono no debe exceder 20 caracteres")
-        @Pattern(regexp = "^\\+?[0-9]{7,20}$", message = "El teléfono debe ser un número válido")
+        @Pattern(regexp = "^\\+?\\d{7,20}$", message = "El teléfono debe ser un número válido")
         @UniqueValue(entity = User.class, field = "phone", message = "El teléfono ya está registrado")
         String phone,
 
@@ -58,6 +58,20 @@ public record UserCreateRequest(
 
         @Valid
         @Size(min = 1, message = "Debe especificar al menos un rol si se envía el campo", groups = Create.class)
-        Set<@Valid RoleRequest> roles
+        Set<@Valid RoleRequest> roles,
 
-) {}
+        @DecimalMin(value = "-90.0", message = "La latitud mínima es -90")
+        @DecimalMax(value = "90.0",  message = "La latitud máxima es 90")
+        Double latitude,
+
+        @DecimalMin(value = "-180.0", message = "La longitud mínima es -180")
+        @DecimalMax(value = "180.0",  message = "La longitud máxima es 180")
+        Double longitude
+
+) {
+    @AssertTrue(message = "Debe enviar ambos: latitude y longitude, o ninguno")
+    public boolean isValidLocation() {
+        return (latitude == null && longitude == null) ||
+                (latitude != null && longitude != null);
+    }
+}
