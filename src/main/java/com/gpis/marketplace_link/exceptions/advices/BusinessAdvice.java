@@ -1,12 +1,9 @@
 package com.gpis.marketplace_link.exceptions.advices;
 
 import com.gpis.marketplace_link.exceptions.business.incidences.*;
-import com.gpis.marketplace_link.exceptions.business.publications.InvalidImageFileException;
-import com.gpis.marketplace_link.exceptions.business.publications.PublicationNotFoundException;
-import com.gpis.marketplace_link.exceptions.business.publications.PublicationUnderReviewException;
+import com.gpis.marketplace_link.exceptions.business.publications.*;
 import com.gpis.marketplace_link.exceptions.business.users.ModeratorNotFoundException;
 import com.gpis.marketplace_link.exceptions.business.users.ReporterNotFoundException;
-import com.gpis.marketplace_link.exceptions.business.publications.DangerousDictionaryLoadException;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -75,12 +72,20 @@ public class BusinessAdvice {
         return pd;
     }
 
+    @ExceptionHandler(DangerousContentException.class)
+    public ProblemDetail handleDangerousContent(DangerousContentException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Contenido peligroso detectado");
+        return pd;
+    }
+
     @ExceptionHandler(InvalidImageFileException.class)
     public ProblemDetail handleInvalidImageFile(InvalidImageFileException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         pd.setTitle("Imagen inválida");
         return pd;
     }
+
 
     // --- usuarios ---
     @ExceptionHandler(ModeratorNotFoundException.class)

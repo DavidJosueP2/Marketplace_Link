@@ -1,16 +1,20 @@
 package com.gpis.marketplace_link.services.publications;
 
+import com.gpis.marketplace_link.dto.incidence.RequestSystemReport;
 import com.gpis.marketplace_link.dto.publication.request.PublicationCreateRequest;
 import com.gpis.marketplace_link.dto.publication.response.PublicationResponse;
 import com.gpis.marketplace_link.dto.publication.response.PublicationSummaryResponse;
 import com.gpis.marketplace_link.entities.Publication;
 import com.gpis.marketplace_link.entities.PublicationImage;
+import com.gpis.marketplace_link.exceptions.business.publications.DangerousContentException;
 import com.gpis.marketplace_link.exceptions.business.publications.PublicationNotFoundException;
 import com.gpis.marketplace_link.mappers.PublicationMapper;
-import com.gpis.marketplace_link.repositories.PublicationImageRepository;
 import com.gpis.marketplace_link.repositories.PublicationRepository;
 import com.gpis.marketplace_link.repositories.UserRepository;
 import com.gpis.marketplace_link.repositories.CategoryRepository;
+import com.gpis.marketplace_link.services.incidence.IncidenceService;
+import com.gpis.marketplace_link.services.incidence.IncidenceServiceImp;
+import com.gpis.marketplace_link.services.publications.valueObjects.DangerousWordMatch;
 import com.gpis.marketplace_link.specifications.PublicationSpecifications;
 import com.gpis.marketplace_link.enums.PublicationStatus;
 import org.springframework.data.domain.Page;
@@ -23,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class PublicationService {
@@ -30,19 +35,20 @@ public class PublicationService {
     private final PublicationRepository repository;
     private final PublicationMapper mapper;
     private final FileStorageService fileStorageService;
-    private final PublicationImageRepository publicationImageRepository;
+    private final DangerousContentDetectedService dangerousContentDetectedService;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final ImageValidationService imageValidationService;
-
-    public PublicationService(PublicationRepository repository , PublicationMapper mapper,FileStorageService fileStorageService, PublicationImageRepository publicationImageRepository, UserRepository userRepository, CategoryRepository categoryRepository, ImageValidationService imageValidationService) {
+   private final IncidenceService incidenceService;
+    public PublicationService(PublicationRepository repository , PublicationMapper mapper, FileStorageService fileStorageService, UserRepository userRepository, CategoryRepository categoryRepository, ImageValidationService imageValidationService, IncidenceServiceImp incidenceServiceImp, DangerousContentDetectedService dangerousContentDetectedService) {
         this.repository = repository;
         this.mapper = mapper;
         this.fileStorageService = fileStorageService;
-        this.publicationImageRepository = publicationImageRepository;
+        this.incidenceService = incidenceServiceImp;
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.imageValidationService = imageValidationService;
+        this.dangerousContentDetectedService = dangerousContentDetectedService;
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +85,7 @@ public class PublicationService {
 
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = DangerousContentException.class)
     public PublicationResponse create(PublicationCreateRequest request){
 
 
@@ -96,10 +102,8 @@ public class PublicationService {
             publication.setVendor(userRepository.getReferenceById(request.vendorId()));
             publication.setCategory(categoryRepository.getReferenceById(request.categoryId()));
 
-            // Inicializar la lista de imágenes ANTES de agregar elementos
             publication.setImages(new ArrayList<>());
 
-            // Agregar imágenes con la relación bidireccional configurada correctamente
         for (String path : imagesNames) {
             PublicationImage img = new PublicationImage();
             img.setPath(path);
@@ -107,10 +111,43 @@ public class PublicationService {
             publication.getImages().add(img);
         }
 
+       if(dangerousContentDetectedService.containsDangerousContent(publication.getName())
+           || dangerousContentDetectedService.containsDangerousContent(publication.getDescription())){
+
+           publication.setStatus(PublicationStatus.UNDER_REVIEW);
+           Publication saved = repository.save(publication);
+
+           List<DangerousWordMatch> dangerousWordsDetected = dangerousContentDetectedService.findDangerousWords(
+                   publication.getName() + " " + publication.getDescription()
+           );
+
+          this.reportPublicationForDangerousContent(saved, dangerousWordsDetected);
+
+              throw new DangerousContentException(
+                     "Se ha detectado que su publicación contiene contenido peligroso, por lo que ha sido enviada a revisión, si sospecha que se ha cometido un error por favor realice una apelación."
+              );
+       }
+
         publication.setStatus(PublicationStatus.VISIBLE);
         Publication saved = repository.save(publication);
 
+
         return mapper.toResponse(saved);
+    }
+
+
+    private void reportPublicationForDangerousContent(Publication publication, List<DangerousWordMatch> dangerousWordsDetected){
+        RequestSystemReport requestSystemReport = new RequestSystemReport();
+        requestSystemReport.setPublicationId(publication.getId());
+        requestSystemReport.setReason("Contenido peligroso detectado");
+        requestSystemReport.setComment(
+                "Se han detectado las siguientes palabras: " +
+                        dangerousWordsDetected.stream()
+                                .map(dw -> dw.wordInText() + " (" + dw.patternMatched() + ")")
+                                .distinct()
+                                .collect(Collectors.joining(", "))
+        );
+        incidenceService.reportBySystem(requestSystemReport);
     }
 
 

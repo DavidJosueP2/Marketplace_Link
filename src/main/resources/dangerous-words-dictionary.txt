@@ -1,4 +1,3 @@
-arma
 arm
 pistol
 rifl
