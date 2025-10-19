@@ -1,20 +1,27 @@
 package com.gpis.marketplace_link.services.publications;
 
 import com.gpis.marketplace_link.exceptions.business.publications.DangerousDictionaryLoadException;
+import com.gpis.marketplace_link.services.publications.valueObjects.DangerousWordMatch;
+import jakarta.annotation.PostConstruct;
+import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
+@Service
 public class DangerousContentDetectedService {
+
 
     private List<Pattern> pattern;
 
+    @PostConstruct
     public void loadDictionary() {
 
         try (InputStream in = getClass().getClassLoader().getResourceAsStream("dangerous-words-dictionary.txt")) {
@@ -49,13 +56,40 @@ public class DangerousContentDetectedService {
         return false;
     }
 
-    public List<String> findDangerousWords(String text) {
-        if (text == null || text.isBlank()) return Collections.emptyList();
-        if (pattern == null || pattern.isEmpty()) return Collections.emptyList();
 
-        return pattern.stream()
-                .filter(p -> p.matcher(text).find())
-                .map(Pattern::pattern)
-                .toList();
+    public List<DangerousWordMatch> findDangerousWords(String text) {
+        if (text == null || text.isBlank() || pattern == null || pattern.isEmpty())
+            return Collections.emptyList();
+
+        List<DangerousWordMatch> matches = new ArrayList<>();
+        for (Pattern p : pattern) {
+            Matcher matcher = p.matcher(text);
+            while (matcher.find()) {
+
+                String fullWord = extractFullWord(text, matcher.start());
+
+                String cleanPattern = p.pattern().replace("\\Q", "").replace("\\E", "");
+                matches.add(new DangerousWordMatch(fullWord, cleanPattern));
+            }
+        }
+        return matches;
+    }
+
+
+    private String extractFullWord(String text, int matchStart) {
+        int start = matchStart;
+        int end = matchStart;
+
+
+        while (start > 0 && Character.isLetterOrDigit(text.charAt(start - 1))) {
+            start--;
+        }
+
+
+        while (end < text.length() && Character.isLetterOrDigit(text.charAt(end))) {
+            end++;
+        }
+
+        return text.substring(start, end);
     }
 }

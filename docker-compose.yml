@@ -23,7 +23,7 @@ services:
     networks:
       - mplink_net
 
-  # Contenedor de pruebas (efímero)
+  # Contenedor de pruebas
   mplink_postgres_test:
     image: postgis/postgis:16-3.5
     container_name: mplink_marketplace_test_db
