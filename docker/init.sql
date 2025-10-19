@@ -32,6 +32,8 @@ CREATE TABLE users (
     updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted          BOOLEAN      NOT NULL DEFAULT FALSE,
 
+    location           GEOGRAPHY(Point, 4326),
+
     CONSTRAINT uk_user_username UNIQUE (username),
     CONSTRAINT uk_user_email    UNIQUE (email),
     CONSTRAINT uk_user_phone    UNIQUE (phone),
@@ -130,7 +132,7 @@ CREATE TABLE IF NOT EXISTS publications (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL,
-    availability VARCHAR(20) NOT NULL  DEFAULT 'AVAILABLE', -- AVAILABLE, NOT_AVAILABLE
+    availability VARCHAR(20) NOT NULL  DEFAULT 'AVAILABLE', -- AVAILABLE, UNAVAILABLE
     status VARCHAR(20) NOT NULL DEFAULT 'VISIBLE', -- VISIBLE,  UNDER_REVIEW , BLOCKED,
     publication_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     location geography(Point, 4326), --WGS 84 empleado para sistemas GPS
@@ -177,16 +179,18 @@ INSERT INTO roles (name) VALUES
                              ('ROLE_SYSTEM')
 ON CONFLICT (name) DO NOTHING;
 
--- ======================
--- Inserción de usuarios de prueba
--- ======================
--- ================
--- Seed: single admin + sample users (bcrypt via crypt)
--- ================
+-- Asegurar extensiones requeridas
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Usuario del sistema
+-- =====================================
+-- USUARIOS CON UBICACIÓN EN AMBATO
+-- =====================================
+
+-- Usuario del sistema → Parque Juan Montalvo
 INSERT INTO users (
-    cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at
+    cedula, username, password, email, phone, first_name, last_name, gender,
+    account_status, email_verified_at, location
 ) VALUES (
              '9999999999',
              'system_user',
@@ -197,7 +201,8 @@ INSERT INTO users (
              'Bot',
              'OTHER',
              'ACTIVE',
-             NOW()
+             NOW(),
+             ST_SetSRID(ST_MakePoint(-78.62935, -1.24222), 4326)
          ) ON CONFLICT (username) DO NOTHING;
 
 -- Rol del sistema
@@ -207,42 +212,59 @@ VALUES (
            (SELECT id FROM roles WHERE name = 'ROLE_SYSTEM')
        ) ON CONFLICT (user_id, role_id) DO NOTHING;
 
--- Otros usuarios
+-- Admin único → Catedral de Ambato
+INSERT INTO users (
+    cedula, username, password, email, phone, first_name, last_name, gender,
+    account_status, email_verified_at, location
+) VALUES (
+             '0000000000',
+             'admin',
+             crypt('admin123', gen_salt('bf',12)),
+             'admin@example.com',
+             '+593000000000',
+             'Admin',
+             'Root',
+             'MALE',
+             'ACTIVE',
+             NOW(),
+             ST_SetSRID(ST_MakePoint(-78.628837, -1.241657), 4326)
+         ) ON CONFLICT (username) DO NOTHING;
 
--- Admin único
-INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at)
-VALUES (
-           '0000000000',
-           'admin',
-           crypt('admin123', gen_salt('bf',12)),
-           'admin@example.com',
-           '+593000000000',
-           'Admin',
-           'Root',
-           'MALE',
-           'ACTIVE',
-           NOW()
-       )
+-- Otros usuarios con ubicaciones distintas en Ambato
+INSERT INTO users (
+    cedula, username, password, email, phone, first_name, last_name, gender,
+    account_status, email_verified_at, location
+) VALUES
+      -- Parque Cevallos
+      ('0202020202', 'moderator_user', crypt('password123', gen_salt('bf',12)),
+       'moderator@example.com', '0999000002', 'Moderator', 'User', 'FEMALE',
+       'ACTIVE', NOW(), ST_SetSRID(ST_MakePoint(-78.62712, -1.24118), 4326)),
+
+      -- Mall de los Andes
+      ('0303030303', 'seller_one', crypt('password123', gen_salt('bf',12)),
+       'seller1@example.com', '0999000003', 'Seller', 'One', 'MALE',
+       'ACTIVE', NOW(), ST_SetSRID(ST_MakePoint(-78.62823, -1.26510), 4326)),
+
+      -- UTA (Campus Huachi)
+      ('0404040404', 'seller_two', crypt('password123', gen_salt('bf',12)),
+       'seller2@example.com', '0999000004', 'Seller', 'Two', 'FEMALE',
+       'ACTIVE', NOW(), ST_SetSRID(ST_MakePoint(-78.62411, -1.26901), 4326)),
+
+      -- Terminal Terrestre Ambato
+      ('0505050505', 'buyer_user', crypt('password123', gen_salt('bf',12)),
+       'buyer@example.com', '0999000005', 'Buyer', 'User', 'MALE',
+       'ACTIVE', NOW(), ST_SetSRID(ST_MakePoint(-78.61652, -1.23603), 4326))
 ON CONFLICT (username) DO NOTHING;
 
--- Otros usuarios
-INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at)
-VALUES
-    ('0202020202', 'moderator_user', crypt('password123', gen_salt('bf',12)), 'moderator@example.com', '0999000002', 'Moderator','User','FEMALE','ACTIVE', NOW()),
-    ('0303030303', 'seller_one',     crypt('password123', gen_salt('bf',12)), 'seller1@example.com',   '0999000003', 'Seller',   'One', 'MALE',  'ACTIVE', NOW()),
-    ('0404040404', 'seller_two',     crypt('password123', gen_salt('bf',12)), 'seller2@example.com',   '0999000004', 'Seller',   'Two', 'FEMALE','ACTIVE', NOW()),
-    ('0505050505', 'buyer_user',     crypt('password123', gen_salt('bf',12)), 'buyer@example.com',     '0999000005', 'Buyer',    'User','MALE',  'ACTIVE', NOW())
-ON CONFLICT (username) DO NOTHING;
-
--- ================
--- Role mapping by fixed ids (ensure PKs match this order)
--- ================
+-- =====================================
+-- Asignación de roles fijos
+-- =====================================
 INSERT INTO users_roles (user_id, role_id) VALUES
-                                               (2, 1), -- admin           -> ROLE_ADMIN
-                                               (3, 2), -- moderator_user  -> ROLE_MODERATOR
-                                               (4, 3), -- seller_one      -> ROLE_SELLER
-                                               (5, 3), -- seller_two      -> ROLE_SELLER
-                                               (6, 4)  -- buyer_user      -> ROLE_BUYER
+                                               ((SELECT id FROM users WHERE username = 'admin'),          (SELECT id FROM roles WHERE name = 'ROLE_ADMIN')),
+                                               ((SELECT id FROM users WHERE username = 'moderator_user'), (SELECT id FROM roles WHERE name = 'ROLE_MODERATOR')),
+                                               ((SELECT id FROM users WHERE username = 'seller_one'),     (SELECT id FROM roles WHERE name = 'ROLE_SELLER')),
+                                               ((SELECT id FROM users WHERE username = 'seller_two'),     (SELECT id FROM roles WHERE name = 'ROLE_SELLER')),
+                                               ((SELECT id FROM users WHERE username = 'buyer_user'),     (SELECT id FROM roles WHERE name = 'ROLE_BUYER'))
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- ======================

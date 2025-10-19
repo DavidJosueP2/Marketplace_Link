@@ -1,4 +1,4 @@
-package com.gpis.marketplace_link.services;
+package com.gpis.marketplace_link.services.user;
 
 import com.gpis.marketplace_link.entities.Role;
 import com.gpis.marketplace_link.repositories.RoleRepository;

@@ -1,10 +1,10 @@
-package com.gpis.marketplace_link.services;
+package com.gpis.marketplace_link.services.user;
 
 import com.gpis.marketplace_link.dto.user.ChangePasswordRequest;
 import com.gpis.marketplace_link.entities.Role;
 import com.gpis.marketplace_link.entities.User;
-import com.gpis.marketplace_link.repositories.UserRepository;
 import com.gpis.marketplace_link.enums.AccountStatus;
+import com.gpis.marketplace_link.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,10 +21,24 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final String MSG_USER_NOT_FOUND = "Usuario no encontrado";
+    private static final String MSG_INVALID_CREDS = "Credenciales inválidas";
+    private static final String MSG_PASSWORDS_MISMATCH = "Las contraseñas no coinciden";
+    private static final String MSG_PASSWORD_SAME = "La nueva contraseña no puede ser igual a la actual";
+    private static final String MSG_SOFT_DELETE_FAIL = "No se pudo realizar el borrado lógico del usuario";
+
     private final UserRepository userRepo;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationService emailVerificationService;
+
+    private ResponseStatusException notFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, MSG_USER_NOT_FOUND);
+    }
+
+    private ResponseStatusException notFoundWith(String suffix) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, MSG_USER_NOT_FOUND + (suffix == null ? "" : suffix));
+    }
 
     public boolean existsUserByEmail(String email) { return userRepo.existsByEmail(email); }
 
@@ -32,12 +46,12 @@ public class UserService {
 
     public User findByUsername(String username) {
         return userRepo.findByUsername(username).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado con username " + username));
+                notFoundWith(" con username " + username));
     }
 
     public User findByEmail(String email) {
         return userRepo.findByEmail(email).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado con email " + email));
+                notFoundWith(" con email " + email));
     }
 
     @Transactional
@@ -47,9 +61,7 @@ public class UserService {
                 : roleService.resolveOrThrow(user.getRoles());
         user.setRoles(roles);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-
         if (user.getAccountStatus() == null) user.setAccountStatus(AccountStatus.PENDING_VERIFICATION);
-
         User savedUser = userRepo.save(user);
         emailVerificationService.sendVerificationEmail(savedUser);
         return savedUser;
@@ -57,60 +69,49 @@ public class UserService {
 
     @Transactional
     public User update(Long id, User draft) {
-        User existing = userRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado: " + id));
-
+        User existing = userRepo.findById(id).orElseThrow(() -> notFoundWith(": " + id));
         apply(existing, draft);
         return userRepo.save(existing);
     }
 
     @Transactional
     public void changePassword(Long userId, ChangePasswordRequest req) {
-        var user = userRepo.findById(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-
+        var user = userRepo.findById(userId).orElseThrow(this::notFound);
         if (!passwordEncoder.matches(req.currentPassword(), user.getPassword()))
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
-
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, MSG_INVALID_CREDS);
         if (!req.newPassword().equals(req.confirmNewPassword()))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Las contraseñas no coinciden");
-
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, MSG_PASSWORDS_MISMATCH);
         if (passwordEncoder.matches(req.newPassword(), user.getPassword()))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La nueva contraseña no puede ser igual a la actual");
-
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, MSG_PASSWORD_SAME);
         user.setPassword(passwordEncoder.encode(req.newPassword()));
         userRepo.save(user);
     }
 
     @Transactional
     public void resetPassword(Long userId, String newPassword) {
-        var user = userRepo.findById(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-
+        var user = userRepo.findById(userId).orElseThrow(this::notFound);
         if (passwordEncoder.matches(newPassword, user.getPassword()))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La nueva contraseña no puede ser igual a la actual");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, MSG_PASSWORD_SAME);
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepo.save(user);
     }
 
     @Transactional
     public void desactivateUser(Long userId) {
-        userRepo.findById(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        userRepo.findById(userId).orElseThrow(this::notFound);
         if (userRepo.desactivateById(userId) == 0)
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "No se pudo realizar el borrado lógico del usuario");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, MSG_SOFT_DELETE_FAIL);
     }
 
     @Transactional
     public void activateUser(Long userId) {
         if (userRepo.activateById(userId) == 0)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado con ID: " + userId);
+            throw notFoundWith(" con ID: " + userId);
     }
 
     @Transactional
     public void blockUser(Long userId) {
-        var user = userRepo.findById(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        var user = userRepo.findById(userId).orElseThrow(this::notFound);
         if (user.getAccountStatus() != AccountStatus.BLOCKED) {
             user.setAccountStatus(AccountStatus.BLOCKED);
             userRepo.save(user);
@@ -119,8 +120,7 @@ public class UserService {
 
     @Transactional
     public void unblockUser(Long userId) {
-        var user = userRepo.findById(userId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+        var user = userRepo.findById(userId).orElseThrow(this::notFound);
         if (user.getAccountStatus() != AccountStatus.ACTIVE) {
             user.setAccountStatus(AccountStatus.ACTIVE);
             userRepo.save(user);
@@ -136,13 +136,12 @@ public class UserService {
         if (draft.getCedula() != null)          existing.setCedula(draft.getCedula());
         if (draft.getGender() != null)          existing.setGender(draft.getGender());
         if (draft.getAccountStatus() != null)   existing.setAccountStatus(draft.getAccountStatus());
-
+        if (draft.getLocation() != null)        existing.setLocation(draft.getLocation());
         if (draft.getPassword() != null && !draft.getPassword().isBlank()) {
             if (passwordEncoder.matches(draft.getPassword(), existing.getPassword()))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La nueva contraseña no puede ser igual a la actual");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, MSG_PASSWORD_SAME);
             existing.setPassword(passwordEncoder.encode(draft.getPassword()));
         }
-
         if (draft.getRoles() != null) {
             existing.setRoles(roleService.resolveOrThrow(draft.getRoles()));
         }

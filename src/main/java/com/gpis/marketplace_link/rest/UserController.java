@@ -6,13 +6,11 @@ import com.gpis.marketplace_link.dto.user.UserResponse;
 import com.gpis.marketplace_link.dto.user.UserUpdateRequest;
 import com.gpis.marketplace_link.mappers.UserMapper;
 import com.gpis.marketplace_link.entities.User;
-import com.gpis.marketplace_link.services.UserService;
-import com.gpis.marketplace_link.validation.groups.Update;
+import com.gpis.marketplace_link.services.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;

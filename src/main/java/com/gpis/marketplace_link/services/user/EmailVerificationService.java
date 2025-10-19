@@ -1,4 +1,4 @@
-package com.gpis.marketplace_link.services;
+package com.gpis.marketplace_link.services.user;
 
 import com.gpis.marketplace_link.entities.EmailVerificationToken;
 import com.gpis.marketplace_link.entities.User;
@@ -6,6 +6,7 @@ import com.gpis.marketplace_link.repositories.EmailVerificationTokenRepository;
 import com.gpis.marketplace_link.repositories.UserRepository;
 import com.gpis.marketplace_link.enums.AccountStatus;
 import com.gpis.marketplace_link.enums.EmailType;
+import com.gpis.marketplace_link.services.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -31,8 +32,9 @@ public class EmailVerificationService {
     private String frontendUrl;
 
     public void sendVerificationEmail(User user) {
-        if (user.getAccountStatus() == AccountStatus.ACTIVE)
+        if (user.getAccountStatus() == AccountStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cuenta ya está activa.");
+        }
 
         EmailVerificationToken token = new EmailVerificationToken();
         token.setToken(generateToken());
@@ -62,11 +64,13 @@ public class EmailVerificationService {
         EmailVerificationToken token = tokenRepository.findByToken(tokenValue)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token inválido."));
 
-        if (token.isUsed())
+        if (token.isUsed()) {
             throw new ResponseStatusException(HttpStatus.GONE, "El token ya fue utilizado.");
+        }
 
-        if (token.isExpired())
+        if (token.isExpired()) {
             throw new ResponseStatusException(HttpStatus.GONE, "El token ha expirado.");
+        }
 
         User user = token.getUser();
         user.setAccountStatus(AccountStatus.ACTIVE);
@@ -81,8 +85,26 @@ public class EmailVerificationService {
     public void resend(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado."));
-        if (user.getAccountStatus() == AccountStatus.ACTIVE)
+        if (user.getAccountStatus() == AccountStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cuenta ya está activa.");
+        }
+        sendVerificationEmail(user);
+    }
+
+    @Transactional
+    public void resendByToken(String tokenValue) {
+        EmailVerificationToken currentToken = tokenRepository.findByToken(tokenValue)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token inválido."));
+        User user = currentToken.getUser();
+
+        if (user.getAccountStatus() == AccountStatus.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cuenta ya está activa.");
+        }
+
+        if (!currentToken.isUsed() && !currentToken.isExpired()) {
+            currentToken.setExpiresAt(LocalDateTime.now().plusHours(24));
+            tokenRepository.save(currentToken);
+        }
 
         sendVerificationEmail(user);
     }

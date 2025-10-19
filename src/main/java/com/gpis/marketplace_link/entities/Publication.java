@@ -1,6 +1,8 @@
 package com.gpis.marketplace_link.entities;
 
+import com.gpis.marketplace_link.enums.PublicationAvailable;
 import com.gpis.marketplace_link.enums.PublicationStatus;
+import com.gpis.marketplace_link.enums.PublicationType;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.locationtech.jts.geom.Point;
@@ -8,6 +10,7 @@ import org.locationtech.jts.geom.Point;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "publications")
@@ -19,11 +22,12 @@ public class Publication {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
+    @Column(unique = true, length = 20)
     private String code;
 
     @Column(nullable = false)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private PublicationType type;
 
     @Column(nullable = false)
     private String name;
@@ -35,7 +39,8 @@ public class Publication {
     private BigDecimal price;
 
     @Column(nullable = false)
-    private String availability;
+    @Enumerated(EnumType.STRING)
+    private PublicationAvailable availability;
 
 
     @Enumerated(EnumType.STRING)
@@ -64,7 +69,7 @@ public class Publication {
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @OneToMany(mappedBy = "publication", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "publication", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PublicationImage> images;
 
     public void setUnderReview() {
@@ -79,4 +84,19 @@ public class Publication {
         this.status = PublicationStatus.BLOCKED;
     }
 
+    @PrePersist
+    public void prePersist() {
+        this.publicationDate = LocalDateTime.now();
+
+        String raw = UUID.randomUUID().toString().replace("-", "");
+        this.code = raw.substring(0, 20);
+        this.type = this.workingHours != null ? PublicationType.SERVICE : PublicationType.PRODUCT;
+        this.availability= PublicationAvailable.AVAILABLE;
+    }
+
+    @PreUpdate
+    public void preUpdate()
+    {
+        this.type = this.workingHours != null ? PublicationType.SERVICE : PublicationType.PRODUCT;
+    }
 }

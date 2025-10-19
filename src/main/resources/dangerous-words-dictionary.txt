@@ -1,4 +1,3 @@
-arma
 arm
 pistol
 rifl
@@ -166,4 +165,3 @@ corrupt
 crime
 criminal
 illegal
-
