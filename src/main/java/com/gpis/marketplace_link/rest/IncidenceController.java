@@ -40,10 +40,22 @@ public class IncidenceController {
         return incidenceService.fetchAllReviewed();
     }
 
-    @PreAuthorize("hasRole('MODERATONR')")
+    @PreAuthorize("hasRole('MODERATOR')")
     @PostMapping("/claim")
     public ClaimIncidenceResponse claim(@Valid @RequestBody RequestClaimIncidence req) {
         return incidenceService.claim(req);
+    }
+
+    @PreAuthorize("hasRole('MODERATOR')")
+    @PostMapping("/decision")
+    public DecisionResponse makeDecision(@Valid @RequestBody RequestMakeDecision req) {
+        return incidenceService.makeDecision(req);
+    }
+
+    @PreAuthorize("hasRole('SELLER')")
+    @PostMapping("/appeal")
+    public AppealResponse appealIncidence(@Valid @RequestBody RequestAppealIncidence req) {
+        return incidenceService.appeal(req);
     }
 
 }

@@ -71,4 +71,12 @@ public class Publication {
         this.status = PublicationStatus.UNDER_REVIEW;
     }
 
+    public void setVisible() {
+        this.status = PublicationStatus.VISIBLE;
+    }
+
+    public void setBlocked() {
+        this.status = PublicationStatus.BLOCKED;
+    }
+
 }

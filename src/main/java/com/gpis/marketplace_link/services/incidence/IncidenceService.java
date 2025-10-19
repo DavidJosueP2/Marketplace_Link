@@ -12,6 +12,7 @@ public interface IncidenceService {
     List<IncidenceDetailsResponse> fetchAllUnreviewed();
     List<IncidenceDetailsResponse> fetchAllReviewed();
     ClaimIncidenceResponse claim(RequestClaimIncidence req);
-    //void makeDecision(RequestMakeDecision req);
+    DecisionResponse makeDecision(RequestMakeDecision req);
+    AppealResponse appeal(RequestAppealIncidence req);
 
 }

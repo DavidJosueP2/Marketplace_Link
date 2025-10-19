@@ -322,7 +322,15 @@ CREATE TABLE appeals (
                          seller_id BIGINT NOT NULL,				 -- el vendedor que hace la apelacion
                          reason TEXT NOT NULL,
                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                         new_moderator_id BIGINT,				 -- para elegir el nuevo moderador se hace cálculos en el back
+                         status VARCHAR(20) CHECK (
+                             status IN (
+                                        'PENDING',          -- apelación creada, esperando asignación de nuevo moderador
+                                        'ASSIGNED',         -- nuevo moderador asignado, en revisión
+                                        'FAILED_NO_MOD',    -- no hay moderadores disponibles
+                                        'REVIEWED'          -- revisión completada (decision final tomada)
+                                 )
+                             ) DEFAULT 'PENDING',
+                         new_moderator_id BIGINT,				 -- para elegir el nuevo moderador se hace cálculos en el back (puede ser nulo si no hay moderadores)
                          final_decision VARCHAR(20) CHECK (final_decision IN ('ACCEPTED','REJECTED')),
                          final_decision_at TIMESTAMP,
 

@@ -52,6 +52,27 @@ public class BusinessAdvice {
         return pd;
     }
 
+    @ExceptionHandler(IncidenceAlreadyClosedException.class)
+    public ProblemDetail handleAlreadyClosed(IncidenceAlreadyClosedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Incidence Already Closed");
+        return pd;
+    }
+
+    @ExceptionHandler(IncidenceNotClaimableException.class)
+    public ProblemDetail handleNotClaimable(IncidenceNotClaimableException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Incidence Not Claimable");
+        return pd;
+    }
+
+    @ExceptionHandler(SystemActionAlreadyTakenException.class)
+    public ProblemDetail handleSystemActionAlreadyTaken(SystemActionAlreadyTakenException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("System Action Already Taken");
+        return pd;
+    }
+
     // --- publicaciones ---
     @ExceptionHandler(PublicationNotFoundException.class)
     public ProblemDetail handlePublicationNotFound(PublicationNotFoundException ex) {
@@ -86,13 +107,6 @@ public class BusinessAdvice {
     public ProblemDetail handleReporterNotFound(ReporterNotFoundException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         pd.setTitle("Reporter Not Found");
-        return pd;
-    }
-
-    @ExceptionHandler(SystemActionAlreadyTakenException.class)
-    public ProblemDetail handleSystemActionAlreadyTaken(SystemActionAlreadyTakenException ex) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-        pd.setTitle("System Action Already Taken");
         return pd;
     }
 }
