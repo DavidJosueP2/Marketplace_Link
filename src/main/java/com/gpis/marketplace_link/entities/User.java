@@ -9,6 +9,7 @@ import org.hibernate.annotations.SoftDeleteType;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.locationtech.jts.geom.Point;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -80,6 +81,9 @@ public class User {
             }
     )
     private Set<Role> roles;
+
+    @Column(name = "location", columnDefinition = "geography(Point, 4326)", nullable = true)
+    private Point location;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status", nullable = false, length = 10)

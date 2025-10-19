@@ -1,4 +1,4 @@
-package com.gpis.marketplace_link.services;
+package com.gpis.marketplace_link.services.user;
 
 import com.gpis.marketplace_link.dto.mail.SendEmailRequest;
 import com.gpis.marketplace_link.dto.user.ForgotPasswordRequest;
@@ -9,7 +9,9 @@ import com.gpis.marketplace_link.repositories.PasswordResetTokenRepository;
 import com.gpis.marketplace_link.repositories.UserRepository;
 import com.gpis.marketplace_link.enums.EmailType;
 import com.gpis.marketplace_link.mail.PasswordResetUrl;
+import com.gpis.marketplace_link.services.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PasswordResetService {
@@ -82,7 +85,7 @@ public class PasswordResetService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token ya fue utilizado");
 
         if (token.getExpiration().isBefore(LocalDateTime.now()))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token ha expirado");
+            throw new ResponseStatusException(HttpStatus.GONE, "El token ha expirado");
 
         token.setUsed(true);
         passwordResetTokenRepository.save(token);

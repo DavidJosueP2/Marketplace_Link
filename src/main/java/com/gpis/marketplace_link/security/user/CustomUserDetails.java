@@ -1,6 +1,7 @@
 package com.gpis.marketplace_link.security.user;
 
 import com.gpis.marketplace_link.entities.User;
+import com.gpis.marketplace_link.enums.AccountStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,24 +16,25 @@ import java.util.Collection;
  * Los roles del usuario se convierten en objetos GrantedAuthority,
  * necesarios para el control de acceso dentro de Spring Security.
  */
+
 public record CustomUserDetails(User user) implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return user.getRoles()
                 .stream()
-                .map((role -> new SimpleGrantedAuthority(role.getName())))
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
                 .toList();
     }
 
     @Override
     public String getPassword() {
-        return this.user.getPassword();
+        return user.getPassword();
     }
 
     @Override
     public String getUsername() {
-        return this.user.getEmail();
+        return user.getEmail();
     }
 
     @Override
@@ -42,7 +44,7 @@ public record CustomUserDetails(User user) implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return user.getAccountStatus() != AccountStatus.BLOCKED;
     }
 
     @Override
@@ -52,6 +54,6 @@ public record CustomUserDetails(User user) implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return !this.user.getDeleted(); // si deleted = false --> enabled = true --> puede iniciar sesión
+        return user.getAccountStatus() == AccountStatus.ACTIVE && !Boolean.TRUE.equals(user.getDeleted());
     }
 }

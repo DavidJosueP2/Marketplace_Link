@@ -2,7 +2,7 @@ package com.gpis.marketplace_link.rest;
 
 import com.gpis.marketplace_link.dto.user.ForgotPasswordRequest;
 import com.gpis.marketplace_link.dto.user.ResetPasswordRequest;
-import com.gpis.marketplace_link.services.PasswordResetService;
+import com.gpis.marketplace_link.services.user.PasswordResetService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,7 @@ public class PasswordResetController {
     private final PasswordResetService passwordResetService;
 
     @PostMapping("/forgot")
-    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req){
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req){
         passwordResetService.forgotPassword(req);
         return ResponseEntity.noContent().build();
     }

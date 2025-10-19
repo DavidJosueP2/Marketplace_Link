@@ -25,7 +25,7 @@ public record UserUpdateRequest(
         String password,
 
         @Size(max = 20, message = "El teléfono no debe exceder 20 caracteres", groups = Update.class)
-        @Pattern(regexp = "^\\+?[0-9]{7,20}$", message = "El teléfono debe ser un número válido", groups = Update.class)
+        @Pattern(regexp = "^\\+?\\d{7,20}$", message = "El teléfono debe ser un número válido")
         @UniqueValue(entity = User.class, field = "phone", message = "El teléfono ya está registrado", groups = Update.class)
         String phone,
 
@@ -48,6 +48,20 @@ public record UserUpdateRequest(
 
         @Valid
         @Size(min = 1, message = "Debe especificar al menos un rol si se envía el campo", groups = Update.class)
-        Set<@Valid RoleRequest> roles
+        Set<@Valid RoleRequest> roles,
 
-) {}
+        @DecimalMin(value = "-90.0", message = "La latitud mínima es -90", groups = Update.class)
+        @DecimalMax(value = "90.0",  message = "La latitud máxima es 90", groups = Update.class)
+        Double latitude,
+
+        @DecimalMin(value = "-180.0", message = "La longitud mínima es -180", groups = Update.class)
+        @DecimalMax(value = "180.0",  message = "La longitud máxima es 180", groups = Update.class)
+        Double longitude
+
+) {
+    @AssertTrue(message = "Debe enviar ambos: latitude y longitude, o ninguno", groups = Update.class)
+    public boolean isValidLocationForUpdate() {
+        return (latitude == null && longitude == null) ||
+                (latitude != null && longitude != null);
+    }
+}
