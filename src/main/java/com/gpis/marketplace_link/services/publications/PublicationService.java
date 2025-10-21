@@ -202,8 +202,14 @@ public class PublicationService {
 
         publication.setDeletedAt(LocalDateTime.now());
 
+        List<PublicationImage> images = publication.getImages();
+
+        for (PublicationImage img : images) {
+            fileStorageService.deleteFile(img.getPath());
+        }
 
         this.repository.save(publication);
+
 
 
     }
@@ -258,7 +264,7 @@ public class PublicationService {
             this.reportPublicationForDangerousContent(saved, dangerousWordsDetected);
 
             throw new DangerousContentException(
-                    "Se ha detectado que su publicación contiene contenido peligroso, por lo que ha sido enviada a revisión, si sospecha que se ha cometido un error por favor realice una apelación."
+                    "Se ha detectado que su publicación contiene contenido peligroso, por lo que ha sido enviada a revisión, si sospecha que se ha cometido un error por favor realice una apelacion, esta le llegara a su correo electrónico."
             );
         }
     }
