@@ -14,6 +14,7 @@ import com.gpis.marketplace_link.exceptions.business.publications.PublicationNot
 import com.gpis.marketplace_link.exceptions.business.publications.PublicationUnderReviewException;
 import com.gpis.marketplace_link.exceptions.business.users.ModeratorNotFoundException;
 import com.gpis.marketplace_link.exceptions.business.users.ReporterNotFoundException;
+import com.gpis.marketplace_link.exceptions.business.users.UserBlockedException;
 import com.gpis.marketplace_link.repositories.*;
 import com.gpis.marketplace_link.security.service.SecurityService;
 import jakarta.validation.constraints.NotNull;
@@ -39,7 +40,8 @@ public class IncidenceServiceImp implements IncidenceService {
     private final UserRepository userRepository;
     private final ReportRepository reportRepository;
     private final AppealRepository appealRepository;
-    private static final int REPORT_THRESHOLD = 3;
+    private final UserBlockLogRepository userBlockLogRepository;
+    private static final int REPORT_THRESHOLD = 10;
     private static final String SYSTEM_USERNAME = "system_user";
 
     @Transactional
@@ -53,17 +55,49 @@ public class IncidenceServiceImp implements IncidenceService {
     @Transactional
     @Override
     public ReportResponse reportByUser(RequestUserReport req) {
+
         // Datos para o crear la incidencia o agregar el reporte a la incidencia existente.
+        List<IncidenceStatus> status = List.of(IncidenceStatus.OPEN, IncidenceStatus.UNDER_REVIEW, IncidenceStatus.APPEALED);
         Long reporterId = securityService.getCurrentUserId();
         Long publicationId = req.getPublicationId();
-        List<IncidenceStatus> status = List.of(IncidenceStatus.OPEN, IncidenceStatus.UNDER_REVIEW, IncidenceStatus.APPEALED);
-        Optional<Incidence> inc = incidenceRepository.findByPublicationIdAndStatusIn(publicationId, status);
 
+        // Antes de cualquier cosa, ver si el usuario esta bloqueado.
+        Optional<UserBlockLog> activeBlock = userBlockLogRepository
+                .findActiveBlockForReport(reporterId, publicationId, LocalDateTime.now());
+
+        // Si es asi, no permitirle reportar.
+        if (activeBlock.isPresent()) {
+            throw new ReporterBlockedFromReportingException("No puedes reportar esta publicación hasta " +
+                    activeBlock.get().getBlockedUntil());
+        }
+
+        Optional<Incidence> inc = incidenceRepository.findByPublicationIdAndStatusIn(publicationId, status);
         Publication pub = publicationRepository.findById(publicationId).orElseThrow(() -> new PublicationNotFoundException(Messages.PUBLICATION_NOT_FOUND + publicationId));
         User reporter = userRepository.findById(reporterId).orElseThrow(() -> new ReporterNotFoundException(Messages.REPORTER_NOT_FOUND + reporterId));
 
         if (pub.getVendor().getId().equals(reporter.getId())) {
             throw new IncidenceNotAllowedToReportOwnPublicationException("No puedes reportar tu propia publicación.");
+        }
+
+        // Si no esta bloqueado, ver cuantos reportes ha hecho ese pana.
+        int reportsInLastHour = reportRepository.countByReporterIdAndPublicationIdAndCreatedAtAfter(
+                reporterId,
+                publicationId,
+                LocalDateTime.now().minusHours(1)
+        );
+
+        if (reportsInLastHour >= 3) {
+            UserBlockLog block = new UserBlockLog();
+            block.setUser(reporter);
+            block.setTargetPublication(pub);
+            block.setReason("Exceso de reportes sobre la misma publicación");
+            block.setBlockedAction("REPORT");
+            block.setBlockedUntil(LocalDateTime.now().plusHours(6));
+            block.setCreatedAt(LocalDateTime.now());
+            userBlockLogRepository.save(block);
+
+            throw new UserBlockedException("Has hecho demasiados reportes sobre esta publicación. " +
+                    "No podrás volver a reportarla hasta " + block.getBlockedUntil());
         }
 
         // No existe incidencia para ese producto, entonces crear la incidencia y el reporte.
