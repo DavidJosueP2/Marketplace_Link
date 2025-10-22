@@ -16,7 +16,8 @@ public class TemplateCatalog {
             Map.entry(EmailType.MODERATOR_ACCOUNT_CREATED, new TemplateInfo("emails/moderator-account-created.html", "Cuenta de Moderador Creada")),
             Map.entry(EmailType.APPOINTMENT_CONFIRMATION, new TemplateInfo("emails/booking-confirmation.html", "Cita confirmada")),
             Map.entry(EmailType.APPOINTMENT_UPDATE, new TemplateInfo("emails/update-booking.html", "Cita actualizada")),
-            Map.entry(EmailType.APPOINTMENT_REMINDER_24H, new TemplateInfo("emails/appointment_reminder_24h.html", "Recordatorio de cita"))
+            Map.entry(EmailType.APPOINTMENT_REMINDER_24H, new TemplateInfo("emails/appointment_reminder_24h.html", "Recordatorio de cita")),
+            Map.entry(EmailType.PUBLICATION_BLOCKED_NOTIFICATION, new TemplateInfo("emails/publication_blocked.html", "Publicación bloqueada"))
     );
 
     public TemplateInfo get(EmailType type) {
