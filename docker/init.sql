@@ -28,7 +28,7 @@ CREATE TABLE users (
     gender           VARCHAR(10),
     account_status   VARCHAR(30)  NOT NULL DEFAULT 'PENDING_VERIFICATION',
     email_verified_at TIMESTAMP NULL,
-x    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted          BOOLEAN      NOT NULL DEFAULT FALSE,
 
@@ -266,7 +266,7 @@ INSERT INTO users (
 
       -- Mall de los Andes
       ('0303030303', 'JoelB', crypt('password123', gen_salt('bf',12)),
-       'seller1@example.com', '0999000003', 'Joel', 'Bonilla', 'MALE',
+       'josuegarcab2@hotmail.com', '0999000003', 'Joel', 'Bonilla', 'MALE',
        'ACTIVE', NOW(), ST_SetSRID(ST_MakePoint(-78.62823, -1.26510), 4326)),
 
       -- UTA (Campus Huachi)
@@ -363,6 +363,7 @@ VALUES
 -- Se genera una automaticmaente cuando se reporta el producto. Es decir, se genera un reporte e incidencia como primer momento.
 CREATE TABLE incidences (
                             id  BIGSERIAL PRIMARY KEY ,
+                            public_ui UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
                             publication_id BIGINT NOT NULL,
                             status VARCHAR(20) CHECK (status IN ('OPEN', 'UNDER_REVIEW','APPEALED','RESOLVED')) DEFAULT 'OPEN',
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -13,8 +13,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/appeals")
@@ -22,7 +20,7 @@ public class AppealController {
 
     private final AppealService appealService;
 
-    @PreAuthorize("hasRole('MODERATOR')")
+    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
     @GetMapping("/my")
     public Page<AppealDetailsResponse> fetchMyAppeals(
             @RequestParam(defaultValue = "0") int page,
@@ -32,7 +30,7 @@ public class AppealController {
         return appealService.fetchAll(pageable);
     }
 
-    @PreAuthorize("hasRole('MODERATOR')")
+    @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
     @PostMapping("/decision")
     public AppealSimpleResponse makeAppealDecision(@Valid @RequestBody MakeAppealDecisionRequest req) {
         return appealService.makeDecision(req);

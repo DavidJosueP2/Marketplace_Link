@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Repositorio para el manejo de entidades {@link Incidence}.
@@ -110,4 +111,6 @@ public interface IncidenceRepository extends JpaRepository<Incidence, Long> {
     """)
     boolean existsByIdAndModeratorId(Long incidenceId, Long moderatorId);
 
+    Optional<Incidence> findByPublicId(UUID publicId);
+    
 }

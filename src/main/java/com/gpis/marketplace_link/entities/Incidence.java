@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -18,6 +19,9 @@ public class Incidence {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "public_ui",nullable = false, unique = true, updatable = false)
+    private UUID publicId = UUID.randomUUID();
 
     @ManyToOne()
     @JoinColumn(name = "publication_id")
