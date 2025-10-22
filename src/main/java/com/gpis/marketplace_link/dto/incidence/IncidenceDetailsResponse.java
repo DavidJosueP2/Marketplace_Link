@@ -8,12 +8,15 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
 public class IncidenceDetailsResponse {
 
-    private Long id;
+    @JsonProperty("incidence_id")
+    private UUID publicIncidenceUi;
+
     private IncidenceStatus status;
     private IncidenceDecision incidenceDecision;
 

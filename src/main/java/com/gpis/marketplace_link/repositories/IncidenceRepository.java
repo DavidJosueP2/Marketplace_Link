@@ -111,6 +111,6 @@ public interface IncidenceRepository extends JpaRepository<Incidence, Long> {
     """)
     boolean existsByIdAndModeratorId(Long incidenceId, Long moderatorId);
 
-    Optional<Incidence> findByPublicId(UUID publicId);
+    Optional<Incidence> findByPublicUi(UUID publicUi);
     
 }

@@ -17,7 +17,6 @@ import com.gpis.marketplace_link.security.service.SecurityService;
 import com.gpis.marketplace_link.services.NotificationService;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,9 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -44,13 +41,8 @@ public class IncidenceServiceImp implements IncidenceService {
     private final UserRepository userRepository;
     private final ReportRepository reportRepository;
     private final AppealRepository appealRepository;
-    private final UserBlockLogRepository userBlockLogRepository;
 
-    private static final int REPORT_THRESHOLD = 10;
-    private static final int REPORT_WINDOW_HOURS = 1;
-    private static final int MAX_REPORTS_PER_HOUR = 3;
-    private static final int BLOCK_DURATION_HOURS = 6;
-
+    private static final int REPORT_THRESHOLD = 3;
     private static final String SYSTEM_USERNAME = "system_user";
 
     @Transactional
@@ -61,7 +53,7 @@ public class IncidenceServiceImp implements IncidenceService {
         incidenceRepository.bulkAutoClose(cutoff);
     }
 
-    @Transactional(noRollbackFor = { UserBlockedException.class })
+    @Transactional()
     @Override
     public ReportResponse reportByUser(RequestUserReport req) {
         List<IncidenceStatus> status = List.of(
@@ -72,18 +64,14 @@ public class IncidenceServiceImp implements IncidenceService {
         Long reporterId = securityService.getCurrentUserId();
         Long publicationId = req.getPublicationId();
 
-        // Validar bloqueos existentes
-        this.validateActiveBlock(reporterId, publicationId);
-
         // Obtener entidades base
         Publication pub = publicationRepository.findById(publicationId).orElseThrow(() -> new PublicationNotFoundException(Messages.PUBLICATION_NOT_FOUND + publicationId));
         User reporter = userRepository.findById(reporterId).orElseThrow(() -> new ReporterNotFoundException(Messages.REPORTER_NOT_FOUND + reporterId));
 
         // Validar si el usuario intenta reportar su propia publicación
-        this.validateNotSelfReporting(pub, reporter);
-
-        // Verificar cantidad de reportes recientes y bloquear si excede
-        this.validateReportFrequency(reporter, pub);
+        if (pub.getVendor().getId().equals(reporter.getId())) {
+            throw new IncidenceNotAllowedToReportOwnPublicationException("No puedes reportar tu propia publicación.");
+        }
 
         // Crear o actualizar incidencia
         Optional<Incidence> inc = incidenceRepository.findByPublicationIdAndStatusIn(publicationId, status);
@@ -91,43 +79,6 @@ public class IncidenceServiceImp implements IncidenceService {
             return handleNewIncidence(pub, reporter, req);
         } else {
             return handleExistingIncidence(inc.get(), pub, reporter, req);
-        }
-    }
-
-    private void validateActiveBlock(Long reporterId, Long publicationId) {
-        Optional<UserBlockLog> activeBlock = userBlockLogRepository
-                .findActiveBlockForReport(reporterId, publicationId, LocalDateTime.now());
-
-        if (activeBlock.isPresent()) {
-            throw new ReporterBlockedFromReportingException(Messages.REPORTER_BLOCKED_FROM_REPORTING + activeBlock.get().getBlockedUntil()
-            );
-        }
-    }
-
-    private void validateNotSelfReporting(Publication pub, User reporter) {
-        if (pub.getVendor().getId().equals(reporter.getId())) {
-            throw new IncidenceNotAllowedToReportOwnPublicationException("No puedes reportar tu propia publicación.");
-        }
-    }
-
-    private void validateReportFrequency(User reporter, Publication pub) {
-        int reportsInLastHour = reportRepository.countByReporterIdAndPublicationIdAndCreatedAtAfter(
-                reporter.getId(),
-                pub.getId(),
-                LocalDateTime.now().minusHours(REPORT_WINDOW_HOURS)
-        );
-
-        if (reportsInLastHour >= MAX_REPORTS_PER_HOUR) {
-            UserBlockLog block = new UserBlockLog();
-            block.setUser(reporter);
-            block.setTargetPublication(pub);
-            block.setReason(Messages.BLOCK_REASON_SPAM_REPORTS);
-            block.setBlockedAction(Messages.BLOCK_ACTION_REPORT);
-            block.setBlockedUntil(LocalDateTime.now().plusHours(BLOCK_DURATION_HOURS));
-            block.setCreatedAt(LocalDateTime.now());
-            userBlockLogRepository.save(block);
-
-            throw new UserBlockedException(Messages.USER_BLOCKED_FOR_SPAM_REPORTS + block.getBlockedUntil());
         }
     }
 
@@ -145,7 +96,14 @@ public class IncidenceServiceImp implements IncidenceService {
                 .build();
 
         reportRepository.save(report);
-        return buildReportResponse(savedIncidence.getId(), pub.getId(), Messages.REPORT_SUCCESS);
+
+        return ReportResponse.builder()
+                .publicIncidenceUi(savedIncidence.getPublicUi())
+                .publicationId(pub.getId())
+                .publicationStatus(pub.getStatus())
+                .message(Messages.REPORT_SUCCESS)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 
     private ReportResponse handleExistingIncidence(Incidence existing, Publication pub, User reporter, RequestUserReport req) {
@@ -178,7 +136,13 @@ public class IncidenceServiceImp implements IncidenceService {
             this.notifyUserOfBlockAndAppealOption(existing);
         }
 
-        return buildReportResponse(existing.getId(), pub.getId(), Messages.REPORT_SUCCESS);
+        return ReportResponse.builder()
+                .publicIncidenceUi(existing.getPublicUi())
+                .publicationId(pub.getId())
+                .publicationStatus(pub.getStatus())
+                .message(Messages.REPORT_SUCCESS)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 
     @Transactional
@@ -188,12 +152,17 @@ public class IncidenceServiceImp implements IncidenceService {
 
         // Buscar incidencia activa y usuario del sistema
         Optional<Incidence> optionalIncidence = findActiveIncidence(publicationId);
-        User systemUser = findSystemUser();
+
+        User systemUser = userRepository.findByUsername(SYSTEM_USERNAME)
+                .orElseThrow(() -> new ReporterNotFoundException(Messages.USER_SYSTEM_NOT_FOUND));
 
         // ️ Si no existe incidencia previa, crear una nueva
         if (optionalIncidence.isEmpty()) {
             return createSystemIncidence(publicationId, systemUser, req);
         }
+
+        Publication publication = publicationRepository.findById(publicationId)
+                .orElseThrow(() -> new PublicationNotFoundException(Messages.PUBLICATION_NOT_FOUND + publicationId));
 
         // Si ya existe, validar y agregar evidencia
         Incidence existingIncidence = optionalIncidence.get();
@@ -202,7 +171,13 @@ public class IncidenceServiceImp implements IncidenceService {
         this.updateStatusIfOpen(existingIncidence);
         incidenceRepository.save(existingIncidence);
 
-        return buildReportResponse(existingIncidence.getId(), publicationId, Messages.REPORT_SUCCESS);
+        return ReportResponse.builder()
+                .publicIncidenceUi(existingIncidence.getPublicUi())
+                .publicationId(publicationId)
+                .publicationStatus(publication.getStatus())
+                .message(Messages.REPORT_SUCCESS)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 
     private Optional<Incidence> findActiveIncidence(Long publicationId) {
@@ -212,11 +187,6 @@ public class IncidenceServiceImp implements IncidenceService {
                 IncidenceStatus.APPEALED
         );
         return incidenceRepository.findByPublicationIdAndStatusIn(publicationId, activeStatuses);
-    }
-
-    private User findSystemUser() {
-        return userRepository.findByUsername(SYSTEM_USERNAME)
-                .orElseThrow(() -> new ReporterNotFoundException(Messages.USER_SYSTEM_NOT_FOUND));
     }
 
     private ReportResponse createSystemIncidence(Long publicationId, User systemUser, RequestSystemReport req) {
@@ -241,7 +211,13 @@ public class IncidenceServiceImp implements IncidenceService {
         reportRepository.save(systemReport);
         this.notifyUserOfBlockAndAppealOption(savedIncidence);
 
-        return buildReportResponse(savedIncidence.getId(), publicationId, Messages.REPORT_SUCCESS);
+        return ReportResponse.builder()
+                .publicIncidenceUi(savedIncidence.getPublicUi())
+                .publicationId(publicationId)
+                .publicationStatus(publication.getStatus())
+                .message(Messages.REPORT_SUCCESS)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 
     private void notifyUserOfBlockAndAppealOption(Incidence incidence) {
@@ -251,7 +227,7 @@ public class IncidenceServiceImp implements IncidenceService {
         Map<String, String> variables = Map.of(
                 "fullName", vendor.getFullName(),
                 "publicationName", pub.getName(),
-                "appealLink", this.frontendUrl + "/appeals/" + incidence.getPublicId()
+                "appealLink", this.frontendUrl + "/appeals/" + incidence.getPublicUi()
         );
         notificationService.sendAsync(vendor.getEmail(), EmailType.PUBLICATION_BLOCKED_NOTIFICATION, variables);
     }
@@ -282,15 +258,6 @@ public class IncidenceServiceImp implements IncidenceService {
         }
     }
 
-    private ReportResponse buildReportResponse(Long incidenceId, Long publicationId, String message) {
-        return ReportResponse.builder()
-                .incidenceId(incidenceId)
-                .productId(publicationId)
-                .message(message)
-                .createdAt(LocalDateTime.now())
-                .build();
-    }
-
     @Transactional(readOnly = true)
     @Override
     public Page<IncidenceDetailsResponse> fetchAllUnreviewed(Pageable pageable) {
@@ -311,7 +278,7 @@ public class IncidenceServiceImp implements IncidenceService {
 
             IncidenceDetailsResponse detailsResponse = new IncidenceDetailsResponse();
 
-            detailsResponse.setId(i.getId());
+            detailsResponse.setPublicIncidenceUi(i.getPublicUi());
             detailsResponse.setAutoClosed(i.getAutoclosed());
             detailsResponse.setCreatedAt(i.getCreatedAt());
             detailsResponse.setStatus(i.getStatus());
@@ -355,7 +322,7 @@ public class IncidenceServiceImp implements IncidenceService {
 
             IncidenceDetailsResponse detailsResponse = new IncidenceDetailsResponse();
 
-            detailsResponse.setId(i.getId());
+            detailsResponse.setPublicIncidenceUi(i.getPublicUi());
             detailsResponse.setAutoClosed(i.getAutoclosed());
             detailsResponse.setCreatedAt(i.getCreatedAt());
             detailsResponse.setStatus(i.getStatus());
@@ -398,7 +365,7 @@ public class IncidenceServiceImp implements IncidenceService {
     @Override
     public ClaimIncidenceResponse claim(RequestClaimIncidence req) {
 
-        Incidence incidence = incidenceRepository.findByPublicId(req.getPublicIncidenceUi())
+        Incidence incidence = incidenceRepository.findByPublicUi(req.getPublicIncidenceUi())
                 .orElseThrow(() -> new IncidenceNotFoundException(Messages.INCIDENCE_NOT_FOUND + req.getPublicIncidenceUi()));
 
         Long currentUserId = this.securityService.getCurrentUserId();
@@ -427,7 +394,7 @@ public class IncidenceServiceImp implements IncidenceService {
         incidenceRepository.save(incidence);
 
         ClaimIncidenceResponse response = new ClaimIncidenceResponse();
-        response.setIncidenceId(incidence.getId());
+        response.setPublicIncidenceUi(incidence.getPublicUi());
         response.setModeratorName(moderator.getFirstName() + " " + moderator.getLastName());
         response.setMessage(Messages.INCIDENCE_CLAIMED_SUCCESSFULLY);
 
@@ -438,7 +405,7 @@ public class IncidenceServiceImp implements IncidenceService {
     @Override
     public DecisionResponse makeDecision(RequestMakeDecision req) {
 
-        Incidence incidence = incidenceRepository.findByPublicId(req.getPublicIncidenceUi())
+        Incidence incidence = incidenceRepository.findByPublicUi(req.getPublicIncidenceUi())
                 .orElseThrow(() -> new IncidenceNotFoundException(Messages.INCIDENCE_NOT_FOUND + req.getPublicIncidenceUi()));
 
         if (!incidence.getStatus().equals(IncidenceStatus.UNDER_REVIEW)) {
@@ -472,7 +439,7 @@ public class IncidenceServiceImp implements IncidenceService {
         incidenceRepository.save(incidence);
 
         return new DecisionResponse(
-                incidence.getId(),
+                incidence.getPublicUi(),
                 incidence.getDecision(),
                 incidence.getStatus().name(),
                 Messages.DECISION_PROCESSED_SUCCESSFULLY
@@ -484,7 +451,7 @@ public class IncidenceServiceImp implements IncidenceService {
     public AppealResponse appeal(RequestAppealIncidence req) {
 
         // verificar existencia
-        Incidence incidence = incidenceRepository.findByPublicId(req.getPublicIncidenceUi())
+        Incidence incidence = incidenceRepository.findByPublicUi(req.getPublicIncidenceUi())
                 .orElseThrow(() -> new IncidenceNotFoundException(Messages.INCIDENCE_NOT_FOUND + req.getPublicIncidenceUi()));
 
         // verificar que este rechazada
@@ -524,7 +491,7 @@ public class IncidenceServiceImp implements IncidenceService {
 
             return AppealResponse.builder()
                     .appealId(saved.getId())
-                    .incidenceId(appealedIncidence.getId())
+                    .publicIncidenceUi(appealedIncidence.getPublicUi())
                     .message(Messages.APPEAL_CREATED_PENDING_MODERATOR)
                     .status(AppealStatus.FAILED_NO_MOD)
                     .createdAt(LocalDateTime.now())
@@ -555,7 +522,7 @@ public class IncidenceServiceImp implements IncidenceService {
         // formar respuesta final
         return AppealResponse.builder()
                 .appealId(saved.getId())
-                .incidenceId(appealedIncidence.getId())
+                .publicIncidenceUi(appealedIncidence.getPublicUi())
                 .message(Messages.APPEAL_CREATED_SUCCESS)
                 .status(AppealStatus.ASSIGNED)
                 .createdAt(LocalDateTime.now())

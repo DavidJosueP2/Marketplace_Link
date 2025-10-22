@@ -22,7 +22,7 @@ public final class Messages {
     public static final String REPORTER_BLOCKED_FROM_REPORTING = "No puedes reportar esta publicación hasta ";
     public static final String BLOCK_REASON_SPAM_REPORTS = "Exceso de reportes sobre la misma publicación.";
     public static final String BLOCK_ACTION_REPORT = "REPORT";
-    public static final String USER_BLOCKED_FOR_SPAM_REPORTS = "Has hecho demasiados reportes sobre esta publicación. No podrás volver a reportarla hasta ";
+    public static final String USER_BLOCKED_FOR_SPAM_REPORTS = "Has hecho demasiados reportes sobre esta publicación.";
 
     // === APELACIONES ===
     public static final String INCIDENCE_NOT_APPEALABLE = "Solo se pueden apelar incidencias que hayan sido rechazadas.";
