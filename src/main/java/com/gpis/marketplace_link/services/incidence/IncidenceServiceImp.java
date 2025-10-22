@@ -11,7 +11,6 @@ import com.gpis.marketplace_link.exceptions.business.publications.PublicationNot
 import com.gpis.marketplace_link.exceptions.business.publications.PublicationUnderReviewException;
 import com.gpis.marketplace_link.exceptions.business.users.ModeratorNotFoundException;
 import com.gpis.marketplace_link.exceptions.business.users.ReporterNotFoundException;
-import com.gpis.marketplace_link.exceptions.business.users.UserBlockedException;
 import com.gpis.marketplace_link.repositories.*;
 import com.gpis.marketplace_link.security.service.SecurityService;
 import com.gpis.marketplace_link.services.NotificationService;
@@ -58,6 +57,7 @@ public class IncidenceServiceImp implements IncidenceService {
     public ReportResponse reportByUser(RequestUserReport req) {
         List<IncidenceStatus> status = List.of(
                 IncidenceStatus.OPEN,
+                IncidenceStatus.PENDING_REVIEW,
                 IncidenceStatus.UNDER_REVIEW,
                 IncidenceStatus.APPEALED);
 
@@ -107,6 +107,11 @@ public class IncidenceServiceImp implements IncidenceService {
     }
 
     private ReportResponse handleExistingIncidence(Incidence existing, Publication pub, User reporter, RequestUserReport req) {
+
+        if (existing.getStatus().equals(IncidenceStatus.PENDING_REVIEW)) {
+            throw new RuntimeException("No puedes agregar un reporte a una incidencia que ya está pendiente de revisión.");
+        }
+
         if (existing.getStatus().equals(IncidenceStatus.UNDER_REVIEW)) {
             throw new PublicationUnderReviewException(Messages.PUBLICATION_UNDER_REVIEW_CANNOT_ADD_REPORT);
         }
@@ -130,7 +135,7 @@ public class IncidenceServiceImp implements IncidenceService {
 
         if (existing.getReports().size() >= REPORT_THRESHOLD) {
             pub.setUnderReview();
-            existing.setStatus(IncidenceStatus.UNDER_REVIEW);
+            existing.setStatus(IncidenceStatus.PENDING_REVIEW);
             publicationRepository.save(pub);
             incidenceRepository.save(existing);
             this.notifyUserOfBlockAndAppealOption(existing);
@@ -166,9 +171,27 @@ public class IncidenceServiceImp implements IncidenceService {
 
         // Si ya existe, validar y agregar evidencia
         Incidence existingIncidence = optionalIncidence.get();
-        this.validateNotAppealed(existingIncidence);
-        this.addSystemReport(existingIncidence, systemUser, req);
-        this.updateStatusIfOpen(existingIncidence);
+
+        if (existingIncidence.getStatus().equals(IncidenceStatus.APPEALED)) {
+            throw new IncidenceAppealedException(Messages.INCIDENCE_APPEALED_CANNOT_ADD_REPORT);
+        }
+
+        Report report = Report.builder()
+                .incidence(existingIncidence)
+                .reporter(systemUser)
+                .reason(req.getReason())
+                .comment(req.getComment())
+                .source(ReportSource.SYSTEM)
+                .build();
+
+        existingIncidence.getReports().add(report);
+
+        if (existingIncidence.getStatus().equals(IncidenceStatus.OPEN)) {
+            existingIncidence.setStatus(IncidenceStatus.PENDING_REVIEW);
+            existingIncidence.getPublication().setUnderReview();
+            publicationRepository.save(existingIncidence.getPublication());
+        }
+
         incidenceRepository.save(existingIncidence);
 
         return ReportResponse.builder()
@@ -183,6 +206,7 @@ public class IncidenceServiceImp implements IncidenceService {
     private Optional<Incidence> findActiveIncidence(Long publicationId) {
         List<IncidenceStatus> activeStatuses = List.of(
                 IncidenceStatus.OPEN,
+                IncidenceStatus.PENDING_REVIEW,
                 IncidenceStatus.UNDER_REVIEW,
                 IncidenceStatus.APPEALED
         );
@@ -197,7 +221,7 @@ public class IncidenceServiceImp implements IncidenceService {
 
         Incidence newIncidence = new Incidence();
         newIncidence.setPublication(publication);
-        newIncidence.setStatus(IncidenceStatus.UNDER_REVIEW);
+        newIncidence.setStatus(IncidenceStatus.PENDING_REVIEW);
         Incidence savedIncidence = incidenceRepository.save(newIncidence);
 
         Report systemReport = Report.builder()
@@ -232,32 +256,6 @@ public class IncidenceServiceImp implements IncidenceService {
         notificationService.sendAsync(vendor.getEmail(), EmailType.PUBLICATION_BLOCKED_NOTIFICATION, variables);
     }
 
-    private void validateNotAppealed(Incidence incidence) {
-        if (incidence.getStatus().equals(IncidenceStatus.APPEALED)) {
-            throw new IncidenceAppealedException(Messages.INCIDENCE_APPEALED_CANNOT_ADD_REPORT);
-        }
-    }
-
-    private void addSystemReport(Incidence incidence, User systemUser, RequestSystemReport req) {
-        Report report = Report.builder()
-                .incidence(incidence)
-                .reporter(systemUser)
-                .reason(req.getReason())
-                .comment(req.getComment())
-                .source(ReportSource.SYSTEM)
-                .build();
-
-        incidence.getReports().add(report);
-    }
-
-    private void updateStatusIfOpen(Incidence incidence) {
-        if (incidence.getStatus().equals(IncidenceStatus.OPEN)) {
-            incidence.setStatus(IncidenceStatus.UNDER_REVIEW);
-            incidence.getPublication().setUnderReview();
-            publicationRepository.save(incidence.getPublication());
-        }
-    }
-
     @Transactional(readOnly = true)
     @Override
     public Page<IncidenceDetailsResponse> fetchAllUnreviewed(Pageable pageable) {
@@ -271,50 +269,6 @@ public class IncidenceServiceImp implements IncidenceService {
         Long currentUserId = securityService.getCurrentUserId();
         Page<Incidence> incidences = this.incidenceRepository.findAllReviewedWithDetails(currentUserId, pageable);
         return generatePageIncidenceDetailResponse(incidences);
-    }
-
-    public List<IncidenceDetailsResponse> generateIncidenceDetailResponse(@NotNull List<Incidence> incidences) {
-        return incidences.stream().map(i -> {
-
-            IncidenceDetailsResponse detailsResponse = new IncidenceDetailsResponse();
-
-            detailsResponse.setPublicIncidenceUi(i.getPublicUi());
-            detailsResponse.setAutoClosed(i.getAutoclosed());
-            detailsResponse.setCreatedAt(i.getCreatedAt());
-            detailsResponse.setStatus(i.getStatus());
-            detailsResponse.setIncidenceDecision(i.getDecision());
-
-            // Publicacion
-            SimplePublicationResponse publicationResponse = new SimplePublicationResponse();
-            Publication pub = i.getPublication();
-            publicationResponse.setId(pub.getId());
-            publicationResponse.setDescription(pub.getDescription());
-            publicationResponse.setStatus(pub.getStatus());
-            publicationResponse.setName(pub.getName());
-            detailsResponse.setPublication(publicationResponse);
-
-            // Reportes
-            List<SimpleReportResponse> reports = i.getReports().stream().map(r -> {
-
-                SimpleReportResponse simpleResponse = new SimpleReportResponse();
-                User reporter = r.getReporter();
-
-                UserSimpleResponse userSimpleResponse = new UserSimpleResponse();
-                userSimpleResponse.setId(reporter.getId());
-                userSimpleResponse.setEmail(reporter.getEmail());
-                userSimpleResponse.setFullname(reporter.getFullName());
-
-                simpleResponse.setId(r.getId());
-                simpleResponse.setComment(r.getComment());
-                simpleResponse.setReason(r.getReason());
-                simpleResponse.setReporter(userSimpleResponse);
-
-                return simpleResponse;
-            }).toList();
-            detailsResponse.setReports(reports);
-
-            return detailsResponse;
-        }).toList();
     }
 
     public Page<IncidenceDetailsResponse> generatePageIncidenceDetailResponse(Page<Incidence> page) {
@@ -383,13 +337,11 @@ public class IncidenceServiceImp implements IncidenceService {
             throw new IncidenceAlreadyClosedException(Messages.INCIDENCE_ALREADY_CLOSED);
         }
 
-        if (incidence.getStatus() == IncidenceStatus.OPEN) {
-            incidence.setStatus(IncidenceStatus.UNDER_REVIEW);
-        } else if (incidence.getStatus() != IncidenceStatus.UNDER_REVIEW) {
-            // si no esta ni OPEN ni UNDER_REVIEW, no se puede reclamar
+        if (incidence.getStatus() != IncidenceStatus.OPEN && incidence.getStatus() != IncidenceStatus.PENDING_REVIEW) {
             throw new IncidenceNotClaimableException(Messages.INCIDENCE_NOT_CLAIMABLE + incidence.getStatus());
         }
 
+        incidence.setStatus(IncidenceStatus.UNDER_REVIEW);
         incidence.setModerator(moderator);
         incidenceRepository.save(incidence);
 
@@ -469,6 +421,7 @@ public class IncidenceServiceImp implements IncidenceService {
         Long currentUserId = this.securityService.getCurrentUserId();
 
         incidence.setStatus(IncidenceStatus.APPEALED);
+        incidence.setDecision(IncidenceDecision.PENDING);
         Incidence appealedIncidence = incidenceRepository.save(incidence);
 
         User seller = userRepository.findById(currentUserId)

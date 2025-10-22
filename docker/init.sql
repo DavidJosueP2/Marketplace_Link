@@ -365,12 +365,12 @@ CREATE TABLE incidences (
                             id  BIGSERIAL PRIMARY KEY ,
                             public_ui UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
                             publication_id BIGINT NOT NULL,
-                            status VARCHAR(20) CHECK (status IN ('OPEN', 'UNDER_REVIEW','APPEALED','RESOLVED')) DEFAULT 'OPEN',
+                            status VARCHAR(20) CHECK (status IN ('OPEN', 'PENDING_REVIEW', 'UNDER_REVIEW','APPEALED','RESOLVED')) DEFAULT 'OPEN',
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             auto_closed BOOLEAN DEFAULT FALSE,
                             moderator_id BIGINT,
                             moderator_comment TEXT,
-                            decision VARCHAR(20) CHECK (decision IN ('APPROVED','REJECTED')),
+                            decision VARCHAR(20) CHECK (decision IN ('APPROVED','REJECTED', 'PENDING')) DEFAULT 'PENDING',
 
                             FOREIGN KEY (publication_id) REFERENCES publications(id),
                             FOREIGN KEY (moderator_id) REFERENCES users(id)
@@ -405,7 +405,7 @@ CREATE TABLE appeals (
                                  )
                              ) DEFAULT 'PENDING',
                          new_moderator_id BIGINT,				 -- para elegir el nuevo moderador se hace cálculos en el back (puede ser nulo si no hay moderadores)
-                         final_decision VARCHAR(20) CHECK (final_decision IN ('ACCEPTED','REJECTED')),
+                         final_decision VARCHAR(20) CHECK (final_decision IN ('ACCEPTED','REJECTED', 'PENDING')) DEFAULT 'PENDING',
                          final_decision_at TIMESTAMP,
 
                          CONSTRAINT unique_incidence UNIQUE (incidence_id),

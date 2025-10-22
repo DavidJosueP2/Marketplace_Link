@@ -18,6 +18,8 @@ public class IncidenceDetailsResponse {
     private UUID publicIncidenceUi;
 
     private IncidenceStatus status;
+
+    @JsonProperty("incidence_decision")
     private IncidenceDecision incidenceDecision;
 
     @JsonProperty("created_at")

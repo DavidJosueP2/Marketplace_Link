@@ -55,6 +55,9 @@ public class Incidence {
         if (status == null) {
             status = IncidenceStatus.OPEN;
         }
+        if (decision == null) {
+            decision = IncidenceDecision.PENDING;
+        }
         autoclosed = false;
     }
 }

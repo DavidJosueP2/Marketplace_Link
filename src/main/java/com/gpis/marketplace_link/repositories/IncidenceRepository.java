@@ -70,19 +70,19 @@ public interface IncidenceRepository extends JpaRepository<Incidence, Long> {
         JOIN FETCH r.reporter
         WHERE i.status IN (
             com.gpis.marketplace_link.enums.IncidenceStatus.OPEN,
-            com.gpis.marketplace_link.enums.IncidenceStatus.UNDER_REVIEW
+            com.gpis.marketplace_link.enums.IncidenceStatus.PENDING_REVIEW
         )
         AND i.moderator IS NULL
-        AND i.decision IS NULL
+        AND i.decision = com.gpis.marketplace_link.enums.IncidenceDecision.PENDING
     """,
             countQuery = """
         SELECT COUNT(i) FROM Incidence i
         WHERE i.status IN (
             com.gpis.marketplace_link.enums.IncidenceStatus.OPEN,
-            com.gpis.marketplace_link.enums.IncidenceStatus.UNDER_REVIEW
+            com.gpis.marketplace_link.enums.IncidenceStatus.PENDING_REVIEW
         )
         AND i.moderator IS NULL
-        AND i.decision IS NULL
+        AND i.decision = com.gpis.marketplace_link.enums.IncidenceDecision.PENDING
     """
     )
     Page<Incidence> findAllUnreviewedWithDetails(Pageable pageable);
