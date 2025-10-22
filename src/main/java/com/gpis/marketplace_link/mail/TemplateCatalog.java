@@ -9,13 +9,14 @@ import java.util.Objects;
 @Component
 public class TemplateCatalog {
 
-    private final Map<EmailType, TemplateInfo> byType = Map.of(
-            EmailType.GENERIC,            new TemplateInfo("emails/generic.html",          "Notificación"),
-            EmailType.EMAIL_CONFIRMATION, new TemplateInfo("emails/email-confirmation.html","Confirma tu correo"),
-            EmailType.PASSWORD_RESET,     new TemplateInfo("emails/password-reset.html",   "Restablece tu contraseña"),
-            EmailType.APPOINTMENT_CONFIRMATION, new TemplateInfo("emails/booking-confirmation.html", "Cita confirmada"),
-            EmailType.APPOINTMENT_UPDATE, new TemplateInfo("emails/update-booking.html", "Cita actualizada"),
-            EmailType.APPOINTMENT_REMINDER_24H, new TemplateInfo("emails/appointment_reminder_24h.html", "Recordatorio de cita")
+    private final Map<EmailType, TemplateInfo> byType = Map.ofEntries(
+            Map.entry(EmailType.GENERIC, new TemplateInfo("emails/generic.html", "Notificación")),
+            Map.entry(EmailType.EMAIL_CONFIRMATION, new TemplateInfo("emails/email-confirmation.html", "Confirma tu correo")),
+            Map.entry(EmailType.PASSWORD_RESET, new TemplateInfo("emails/password-reset.html", "Restablece tu contraseña")),
+            Map.entry(EmailType.MODERATOR_ACCOUNT_CREATED, new TemplateInfo("emails/moderator-account-created.html", "Cuenta de Moderador Creada")),
+            Map.entry(EmailType.APPOINTMENT_CONFIRMATION, new TemplateInfo("emails/booking-confirmation.html", "Cita confirmada")),
+            Map.entry(EmailType.APPOINTMENT_UPDATE, new TemplateInfo("emails/update-booking.html", "Cita actualizada")),
+            Map.entry(EmailType.APPOINTMENT_REMINDER_24H, new TemplateInfo("emails/appointment_reminder_24h.html", "Recordatorio de cita"))
     );
 
     public TemplateInfo get(EmailType type) {
