@@ -21,9 +21,9 @@ public class TemplateCatalog {
             Map.entry(EmailType.APPEAL_APPROVED_NOTIFICATION, new TemplateInfo("emails/appeal_approved_notification.html", "Apelación aprobada")),
             Map.entry(EmailType.APPEAL_REJECTED_NOTIFICATION, new TemplateInfo("emails/appeal_rejected_notification.html", "Apelación rechazada")),
             Map.entry(EmailType.NEW_APPEAL_ASSIGNED_TO_MODERATOR_NOTIFICATION, new TemplateInfo("emails/new_appeal_assigned_to_moderator_notification.html", "Nueva apelación asignada")),
-            Map.entry(EmailType.APPEAL_SELLER_MODERATOR_ASSIGNED_NOTIFICATION, new TemplateInfo("emails/appeal_seller_moderator_assigned_notification.html", "Moderador asignado a apelación"))
-
-    );
+            Map.entry(EmailType.APPEAL_SELLER_MODERATOR_ASSIGNED_NOTIFICATION, new TemplateInfo("emails/appeal_seller_moderator_assigned_notification.html", "Moderador asignado a apelación")),
+            Map.entry(EmailType.MODERATOR_ACCOUNT_CREATED, new TemplateInfo("emails/moderator-account-created.html", "Cuenta de Moderador Creada"))
+            );
 
     public TemplateInfo get(EmailType type) {
         return Objects.requireNonNull(byType.get(type), "Tipo de email no soportado: " + type);
