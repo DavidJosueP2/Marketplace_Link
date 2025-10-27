@@ -56,7 +56,8 @@ public class AppealServiceImp implements AppealService {
         for (Appeal appeal : pendingAppeals) {
             // para cada apeal pendiente, asignar un nuevo moderador (sin considerar el de la incidencia de ese apppeal)
             Long moderatorIncidence = appeal.getIncidence().getModerator().getId();
-            Long newModeratorId = userRepository.findLeastBusyModeratorExcludingId(moderatorIncidence);
+            Long newModeratorId = userRepository.findLeastBusyModeratorOrAdminExcludingId(moderatorIncidence);
+            log.info("Asignando nuevo moderador con ID {} al appeal con ID {}", newModeratorId, appeal.getId());
 
             if (newModeratorId != null) {
                 User newModUser = userRepository
@@ -201,12 +202,12 @@ public class AppealServiceImp implements AppealService {
                 throw new UnauthorizedAppealDecisionException(Messages.APPEAL_USER_NOT_AUTHORIZED);
             }
 
-            if (!appeal.getFinalDecision().equals(AppealDecision.PENDING) || appeal.getFinalDecisionAt() != null) {
-                throw new UnauthorizedAppealDecisionException(Messages.APPEAL_ALREADY_DECIDED);
+            if (!appeal.getStatus().equals(AppealStatus.ASSIGNED)) {
+                throw new UnauthorizedAppealDecisionException(Messages.APPEAL_NOT_ASSIGNED);
             }
 
-            if (!appeal.getStatus().equals(AppealStatus.ASSIGNED)) {
-                throw new UnauthorizedAppealDecisionException("Estado de apelación inválido para tomar una decisión.");
+            if (!appeal.getFinalDecision().equals(AppealDecision.PENDING) || appeal.getFinalDecisionAt() != null) {
+                throw new UnauthorizedAppealDecisionException(Messages.APPEAL_ALREADY_DECIDED);
             }
 
             if (!appeal.getIncidence().getStatus().equals(IncidenceStatus.APPEALED)) {
@@ -239,7 +240,7 @@ public class AppealServiceImp implements AppealService {
             return response;
         }
 
-        public void sendAppealApprovedEmailToSeller(Appeal appeal) {
+    public void sendAppealApprovedEmailToSeller(Appeal appeal) {
             Publication pub = appeal.getIncidence().getPublication();
             User vendor = appeal.getSeller();
 
@@ -250,7 +251,7 @@ public class AppealServiceImp implements AppealService {
             notificationService.sendAsync(vendor.getEmail(), EmailType.APPEAL_APPROVED_NOTIFICATION, variables);
         }
 
-        public void sendAppealRejectedEmailToSeller(Appeal appeal) {
+    public void sendAppealRejectedEmailToSeller(Appeal appeal) {
             Publication pub = appeal.getIncidence().getPublication();
             User vendor = appeal.getSeller();
 

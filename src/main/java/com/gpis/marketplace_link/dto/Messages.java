@@ -48,6 +48,7 @@ public final class Messages {
     public static final String APPEAL_INVALID_INCIDENT_STATUS = "El estado de la incidencia no permite tomar una decisión sobre la apelación.";
     public static final String APPEAL_DECISION_SUCCESS = "Decisión tomada con éxito sobre la apelación.";
     public static final String MODERATOR_NOT_FOUND_WITH_ID = "Moderador no encontrado con id=";
+    public static final String APPEAL_NOT_ASSIGNED= "La apelación no está asignada al moderador actual.";
 
     // === DECISIONES ===
     public static final String INCIDENCE_NOT_UNDER_REVIEW = "No puedes tomar una decisión porque la incidencia no está en revisión. Estado actual: ";

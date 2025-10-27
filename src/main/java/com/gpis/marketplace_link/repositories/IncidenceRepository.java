@@ -34,22 +34,22 @@ public interface IncidenceRepository extends JpaRepository<Incidence, Long> {
      * Cierra automáticamente todas las incidencias con estado "OPEN"
      * cuya última actividad (último reporte) sea anterior a la fecha indicada.
      *
-     * @param cutoff fecha límite; incidencias sin actividad más reciente que esta serán cerradas.
+     * @param autoCloseLimit fecha límite; incidencias sin actividad más reciente que esta serán cerradas.
      * @return número de incidencias actualizadas.
      */
     @Modifying
     @Query(value = """
-        UPDATE incidences i
-        SET i.status = 'RESOLVED',
-            i.auto_closed = true
-        WHERE i.status = 'OPEN'
+        UPDATE incidences
+        SET status = 'RESOLVED',
+            auto_closed = true
+        WHERE status = 'OPEN'
         AND (
             SELECT MAX(r.created_at)
             FROM reports r
-            WHERE r.incidence_id = i.id
-        ) < :cutoff
+            WHERE r.incidence_id = incidences.id
+        ) < :autoCloseLimit
     """, nativeQuery = true)
-    int bulkAutoClose(@Param("cutoff") LocalDateTime cutoff);
+    int bulkAutoClose(@Param("autoCloseLimit") LocalDateTime autoCloseLimit);
 
     /**
      * Busca una incidencia asociada a una publicación específica que se encuentre en alguno de los estados indicados.

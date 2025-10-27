@@ -21,10 +21,9 @@ public class IncidenceController {
 
     private final IncidenceService incidenceService;
 
-    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
-    @PostMapping("/report")
-    public ReportResponse report(@Valid @RequestBody RequestUserReport req) {
-        return incidenceService.reportByUser(req);
+    @PostMapping("/system-report")
+    public ReportResponse reportBySystem(@RequestBody RequestSystemReport req) {
+        return incidenceService.reportBySystem(req);
     }
 
     @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
@@ -55,9 +54,15 @@ public class IncidenceController {
     }
 
     @PreAuthorize("hasRole('SELLER')")
-    @GetMapping("/p/{publicUi}")
+    @GetMapping("/s/{publicUi}")
     public IncidenceDetailsResponse fetchByIdForSeller(@PathVariable UUID publicUi) {
         return incidenceService.fetchByPublicUiForSellerNativeProjection(publicUi);
+    }
+
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
+    @PostMapping("/report")
+    public ReportResponse report(@Valid @RequestBody RequestUserReport req) {
+        return incidenceService.reportByUser(req);
     }
 
     @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
