@@ -28,7 +28,7 @@ public class EmailVerificationService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
-    @Value("${FRONTEND_URL}")
+    @Value("${FRONTEND_URL:http://localhost:3000}")
     private String frontendUrl;
 
     public void sendVerificationEmail(User user) {

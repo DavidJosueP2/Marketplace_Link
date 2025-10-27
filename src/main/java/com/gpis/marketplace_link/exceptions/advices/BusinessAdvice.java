@@ -1,5 +1,7 @@
 package com.gpis.marketplace_link.exceptions.advices;
 
+import com.gpis.marketplace_link.exceptions.business.AccessDeniedException;
+import com.gpis.marketplace_link.exceptions.business.appeals.AppealNotFoundException;
 import com.gpis.marketplace_link.exceptions.business.appeals.UnauthorizedAppealDecisionException;
 import com.gpis.marketplace_link.exceptions.business.incidences.*;
 import com.gpis.marketplace_link.exceptions.business.publications.*;
@@ -103,11 +105,38 @@ public class BusinessAdvice {
         return pd;
     }
 
-    @ExceptionHandler(UserBlockedException.class)
-    public ProblemDetail handleUserBlocked(UserBlockedException ex) {
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
-        pd.setTitle("User Blocked");
-        pd.setProperty("blocked_until", ex.getBlockedUntil());
+        pd.setTitle("Access Denied");
+        return pd;
+    }
+
+    @ExceptionHandler(IncidenceAlreadyPendingReviewException.class)
+    public ProblemDetail handleIncidenceAlreadyPendingReview(IncidenceAlreadyPendingReviewException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Incidence Already Pending Review");
+        return pd;
+    }
+
+    @ExceptionHandler(IncidenceNotAllowedToReportOwnPublicationException.class)
+    public ProblemDetail handleIncidenceNotAllowedToReportOwnPublication(IncidenceNotAllowedToReportOwnPublicationException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Incidence Not Allowed To Report Own Publication");
+        return pd;
+    }
+
+    @ExceptionHandler(IncidenceAppealNotAllowedException.class)
+    public ProblemDetail handleIncidenceAppealNotAllowed(IncidenceAppealNotAllowedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Incidence Appeal Not Allowed");
+        return pd;
+    }
+
+    @ExceptionHandler(IncidenceNotAppealableException.class)
+    public ProblemDetail handleIncidenceNotAppealable(IncidenceNotAppealableException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Incidence Not Appealable");
         return pd;
     }
 
@@ -116,6 +145,13 @@ public class BusinessAdvice {
     public ProblemDetail handleUnauthorizedAppealDecision(UnauthorizedAppealDecisionException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         pd.setTitle("Unauthorized Appeal Decision");
+        return pd;
+    }
+
+    @ExceptionHandler(AppealNotFoundException.class)
+    public ProblemDetail handleAppealNotFound(AppealNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Appeal Not Found");
         return pd;
     }
 
@@ -129,7 +165,7 @@ public class BusinessAdvice {
 
     @ExceptionHandler(PublicationUnderReviewException.class)
     public ProblemDetail handlePublicationUnderReview(PublicationUnderReviewException ex) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         pd.setTitle("Publication Under Review");
         return pd;
     }

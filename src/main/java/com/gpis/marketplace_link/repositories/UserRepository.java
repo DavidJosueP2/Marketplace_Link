@@ -1,6 +1,5 @@
 package com.gpis.marketplace_link.repositories;
 
-import com.gpis.marketplace_link.dto.incidence.projections.UserIdProjection;
 import com.gpis.marketplace_link.entities.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -52,12 +51,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
        join roles r on r.id = ur.role_id
        left join incidences i ON i.moderator_id = u.id
        left join appeals a on a.new_moderator_id = u.id
-       where r.name = 'ROLE_MODERATOR' and u.id <> :excludeId
+       where (r.name = 'ROLE_MODERATOR' OR r.name = 'ROLE_ADMIN') and u.id <> :excludeId
        group by u.id
        order by count(distinct i.id) + count(distinct a.id) asc, coalesce(min(i.created_at), now()) asc
        limit 1
       """, nativeQuery = true)
-    Long findLeastBusyModeratorExcludingId(@Param("excludeId") Long excludeId);
+    Long findLeastBusyModeratorOrAdminExcludingId(@Param("excludeId") Long excludeId);
 
     Optional<User> findByEmail(String email);
 

@@ -12,7 +12,7 @@ public class PublicationSuspender {
 
     private final PublicationService service;
 
-    @Value("${SUSPENDED_TIME_DAYS}")
+    @Value("${SUSPENDED_TIME_DAYS:7}")
     private Integer suspendedTimeDays;
 
     @Scheduled(cron="0 0 0 * * *")

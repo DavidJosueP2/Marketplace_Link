@@ -2,6 +2,7 @@ package com.gpis.marketplace_link.rest;
 
 import com.gpis.marketplace_link.dto.incidence.AppealResponse;
 import com.gpis.marketplace_link.dto.incidence.*;
+import com.gpis.marketplace_link.security.service.SecurityService;
 import com.gpis.marketplace_link.services.incidence.IncidenceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +21,17 @@ import java.util.UUID;
 public class IncidenceController {
 
     private final IncidenceService incidenceService;
+    private final SecurityService securityService;
 
-    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
-    @PostMapping("/report")
-    public ReportResponse report(@Valid @RequestBody RequestUserReport req) {
-        return incidenceService.reportByUser(req);
+    @GetMapping("/stats")
+    public IncidenceStatsResponse fetchStprats() {
+        Long userId = securityService.getCurrentUserId();
+        return incidenceService.fetchStatsByUserId(userId);
+    }
+
+    @PostMapping("/system-report")
+    public ReportResponse reportBySystem(@RequestBody RequestSystemReport req) {
+        return incidenceService.reportBySystem(req);
     }
 
     @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")
@@ -55,9 +62,15 @@ public class IncidenceController {
     }
 
     @PreAuthorize("hasRole('SELLER')")
-    @GetMapping("/p/{publicUi}")
+    @GetMapping("/s/{publicUi}")
     public IncidenceDetailsResponse fetchByIdForSeller(@PathVariable UUID publicUi) {
         return incidenceService.fetchByPublicUiForSellerNativeProjection(publicUi);
+    }
+
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
+    @PostMapping("/report")
+    public ReportResponse report(@Valid @RequestBody RequestUserReport req) {
+        return incidenceService.reportByUser(req);
     }
 
     @PreAuthorize("hasAnyRole('MODERATOR', 'ADMIN')")

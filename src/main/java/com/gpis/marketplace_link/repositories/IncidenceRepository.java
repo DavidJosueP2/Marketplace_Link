@@ -1,9 +1,6 @@
 package com.gpis.marketplace_link.repositories;
 
-import com.gpis.marketplace_link.dto.incidence.projections.IncidenceDetailsProjection;
-import com.gpis.marketplace_link.dto.incidence.projections.IncidencePublicationProjection;
-import com.gpis.marketplace_link.dto.incidence.projections.UserIdProjection;
-import com.gpis.marketplace_link.dto.incidence.projections.VendorIdProjection;
+import com.gpis.marketplace_link.dto.incidence.projections.*;
 import com.gpis.marketplace_link.entities.Incidence;
 import com.gpis.marketplace_link.enums.IncidenceStatus;
 import org.springframework.data.domain.Page;
@@ -30,26 +27,38 @@ import java.util.UUID;
  */
 public interface IncidenceRepository extends JpaRepository<Incidence, Long> {
 
+    @Query(value = """
+        SELECT 
+            COUNT(*) AS total,
+            SUM(CASE WHEN i.status = 'UNDER_REVIEW' THEN 1 ELSE 0 END) AS underReview,
+            SUM(CASE WHEN i.status = 'APPEALED' THEN 1 ELSE 0 END) as appealed,
+            SUM(CASE WHEN i.status = 'RESOLVED' THEN 1 ELSE 0 END) AS resolved
+        FROM incidences i
+        WHERE i.moderator_id = :userId
+        """, nativeQuery = true)
+    IncidenceStatsProjection fetchStatsById(@Param("userId") Long userId);
+
+
     /**
      * Cierra automáticamente todas las incidencias con estado "OPEN"
      * cuya última actividad (último reporte) sea anterior a la fecha indicada.
      *
-     * @param cutoff fecha límite; incidencias sin actividad más reciente que esta serán cerradas.
+     * @param autoCloseLimit fecha límite; incidencias sin actividad más reciente que esta serán cerradas.
      * @return número de incidencias actualizadas.
      */
     @Modifying
     @Query(value = """
-        UPDATE incidences i
-        SET i.status = 'RESOLVED',
-            i.auto_closed = true
-        WHERE i.status = 'OPEN'
+        UPDATE incidences
+        SET status = 'RESOLVED',
+            auto_closed = true
+        WHERE status = 'OPEN'
         AND (
             SELECT MAX(r.created_at)
             FROM reports r
-            WHERE r.incidence_id = i.id
-        ) < :cutoff
+            WHERE r.incidence_id = incidences.id
+        ) < :autoCloseLimit
     """, nativeQuery = true)
-    int bulkAutoClose(@Param("cutoff") LocalDateTime cutoff);
+    int bulkAutoClose(@Param("autoCloseLimit") LocalDateTime autoCloseLimit);
 
     /**
      * Busca una incidencia asociada a una publicación específica que se encuentre en alguno de los estados indicados.

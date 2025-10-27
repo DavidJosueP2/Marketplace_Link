@@ -4,12 +4,10 @@ import com.gpis.marketplace_link.dto.Messages;
 import com.gpis.marketplace_link.dto.incidence.AppealResponse;
 import com.gpis.marketplace_link.dto.incidence.*;
 import com.gpis.marketplace_link.dto.incidence.projections.IncidenceDetailsProjection;
-import com.gpis.marketplace_link.dto.incidence.projections.IncidencePublicationProjection;
+import com.gpis.marketplace_link.dto.incidence.projections.IncidenceStatsProjection;
 import com.gpis.marketplace_link.dto.incidence.projections.UserIdProjection;
 import com.gpis.marketplace_link.dto.incidence.projections.VendorIdProjection;
 import com.gpis.marketplace_link.entities.*;
-import com.gpis.marketplace_link.entities.lights.IncidenceLight;
-import com.gpis.marketplace_link.entities.lights.PublicationLight;
 import com.gpis.marketplace_link.enums.*;
 import com.gpis.marketplace_link.exceptions.business.AccessDeniedException;
 import com.gpis.marketplace_link.exceptions.business.incidences.IncidenceNotAppealableException;
@@ -38,7 +36,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class IncidenceServiceImp implements IncidenceService {
 
-    @Value("${FRONTEND_URL}")
+    @Value("${FRONTEND_URL:http://localhost:3000}")
     private String frontendUrl;
 
     private final NotificationService notificationService;
@@ -52,11 +50,25 @@ public class IncidenceServiceImp implements IncidenceService {
     private static final int REPORT_THRESHOLD = 3;
     private static final String SYSTEM_USERNAME = "system_user";
 
+    @Override
+    public IncidenceStatsResponse fetchStatsByUserId(Long id) {
+
+        IncidenceStatsProjection proj = this.incidenceRepository.fetchStatsById(id);
+
+        IncidenceStatsResponse response = new IncidenceStatsResponse();
+        response.setResolved(proj.getResolved());
+        response.setTotal(proj.getTotal());
+        response.setAppealed(proj.getAppealed());
+        response.setUnderReview(proj.getUnderReview());
+
+        return response;
+    }
+
     @Transactional
     @Override
     public void autoclose() {
-        int hours = 24;
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(hours);
+        int hours = 3;
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(hours);
         incidenceRepository.bulkAutoClose(cutoff);
     }
 
@@ -396,16 +408,6 @@ public class IncidenceServiceImp implements IncidenceService {
         if ((user.getAccountStatus().equals(AccountStatus.INACTIVE) && user.getDeleted()) || user.getAccountStatus().equals(AccountStatus.BLOCKED)) {
             throw new AccessDeniedException(Messages.ACCESS_DENIED_TO_CLAIM_INCIDENCE);
         }
-
-        if (incidence.getModerator() != null) {
-            throw new IncidenceAlreadyClaimedException(Messages.INCIDENCE_ALREADY_CLAIMED);
-        }
-        if (incidence.getDecision() != IncidenceDecision.PENDING) {
-            throw new IncidenceAlreadyDecidedException(Messages.INCIDENCE_ALREADY_DECIDED);
-        }
-        if (Boolean.TRUE.equals(incidence.getAutoclosed())) {
-            throw new IncidenceAlreadyClosedException(Messages.INCIDENCE_ALREADY_CLOSED);
-        }
         if (incidence.getStatus() != IncidenceStatus.OPEN && incidence.getStatus() != IncidenceStatus.PENDING_REVIEW) {
             throw new IncidenceNotClaimableException(Messages.INCIDENCE_NOT_CLAIMABLE + incidence.getStatus());
         }
@@ -447,13 +449,12 @@ public class IncidenceServiceImp implements IncidenceService {
             throw new AccessDeniedException(Messages.ACCESS_DENIED_TO_MAKE_DECISION_INCIDENCE);
         }
 
-        if (!incidence.getStatus().equals(IncidenceStatus.UNDER_REVIEW) || !incidence.getDecision().equals(IncidenceDecision.PENDING)) {
+        if (!incidence.getStatus().equals(IncidenceStatus.UNDER_REVIEW)) {
             throw new IncidenceNotUnderReviewException(Messages.INCIDENCE_NOT_UNDER_REVIEW + incidence.getStatus());
         }
 
         // Buscar la incidencia y ver que el id del moderador concide con el currentUserId
         boolean belongsToModerator = incidenceRepository.existsByIdAndModeratorId(incidence.getId(), currentUserId);
-
         if (!belongsToModerator) {
             throw new IncidenceNotBelongToModeratorException(Messages.INCIDENCE_NOT_BELONG_TO_MODERATOR);
         }
@@ -467,6 +468,7 @@ public class IncidenceServiceImp implements IncidenceService {
         if (decision.equals(IncidenceDecision.APPROVED)) {
             incidence.getPublication().setVisible();
 
+            // En ecendia, aqui siempre la incidencia estaria open, si no entra. Si entra, signficia que esta bajo revision.
             if (incidence.getReports().size() >= REPORT_THRESHOLD) {
                 this.notifyUserOfPublicationUnlock(incidence);
             }
@@ -489,7 +491,7 @@ public class IncidenceServiceImp implements IncidenceService {
 
     @Transactional
     @Override
-    public AppealResponse appeal(RequestAppealIncidence req) {
+    public AppealResponse   appeal(RequestAppealIncidence req) {
 
         VendorIdProjection projection = incidenceRepository.findVendorIdByIncidencePublicUi(req.getPublicIncidenceUi())
                 .orElseThrow(() -> new IncidenceNotFoundException(Messages.VENDOR_ID_PROJECTION_NOT_FOUND + req.getPublicIncidenceUi()));
@@ -516,6 +518,8 @@ public class IncidenceServiceImp implements IncidenceService {
 
         // el que hace la apelacion (usuario actual)
         Long currentUserId = this.securityService.getCurrentUserId();
+        User seller = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ReporterNotFoundException(Messages.REPORTER_NOT_FOUND + currentUserId));
 
         // chequear qeu el usuario actual, sea realmente el vendedor de la publicacion asociada a la incidencia
         if (!incidence.getPublication().getVendor().getId().equals(currentUserId)) {
@@ -525,9 +529,6 @@ public class IncidenceServiceImp implements IncidenceService {
         incidence.setStatus(IncidenceStatus.APPEALED);
         Incidence appealedIncidence = incidenceRepository.save(incidence);
 
-        User seller = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new ReporterNotFoundException(Messages.REPORTER_NOT_FOUND + currentUserId));
-
         Appeal appeal = new Appeal();
         appeal.setIncidence(appealedIncidence);
         appeal.setReason(req.getReason());
@@ -535,7 +536,12 @@ public class IncidenceServiceImp implements IncidenceService {
 
         // Calculo del nuevo moderador.
         User previousModerator = appealedIncidence.getModerator();
-        Long newModeratorId = userRepository.findLeastBusyModeratorExcludingId(previousModerator.getId());
+        ModeratorInfo previousModeratorInfo = new ModeratorInfo();
+        previousModeratorInfo.setId(previousModerator.getId());
+        previousModeratorInfo.setFullname(previousModerator.getFullName());
+        previousModeratorInfo.setEmail(previousModerator.getEmail());
+
+        Long newModeratorId = userRepository.findLeastBusyModeratorOrAdminExcludingId(previousModerator.getId());
 
         if (newModeratorId == null) {
             // No hay otros moderadores disponibles. Entonces pasa a una cola de espera, pero el cliente sabra que cada dia a las 3,30 am
@@ -550,7 +556,7 @@ public class IncidenceServiceImp implements IncidenceService {
                     .message(Messages.APPEAL_CREATED_PENDING_MODERATOR)
                     .status(AppealStatus.FAILED_NO_MOD)
                     .createdAt(LocalDateTime.now())
-                    .previousModerator(null)
+                    .previousModerator(previousModeratorInfo)
                     .newModerator(null)
                     .build();
         }
@@ -562,13 +568,6 @@ public class IncidenceServiceImp implements IncidenceService {
         appeal.setNewModerator(newModerator);
         appeal.setStatus(AppealStatus.ASSIGNED);
         Appeal saved = appealRepository.save(appeal);
-
-
-        // formar los dtos para moderadores
-        ModeratorInfo previousModeratorInfo = new ModeratorInfo();
-        previousModeratorInfo.setId(previousModerator.getId());
-        previousModeratorInfo.setFullname(previousModerator.getFullName());
-        previousModeratorInfo.setEmail(previousModerator.getEmail());
 
         ModeratorInfo newModeratorInfo = new ModeratorInfo();
         newModeratorInfo.setId(newModerator.getId());
