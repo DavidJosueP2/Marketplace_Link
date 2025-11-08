@@ -77,6 +77,20 @@ springdoc:
     doc-expansion: none
   remove-broken-reference-definitions: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    mail:
+      enabled: false
+
 frontend:
   url: ${FRONTEND_URL}
 
