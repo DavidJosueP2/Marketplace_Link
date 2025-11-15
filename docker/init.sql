@@ -421,3 +421,127 @@ CREATE TABLE appeals (
                          FOREIGN KEY (seller_id) REFERENCES users(id),
                          FOREIGN KEY (new_moderator_id) REFERENCES users(id)
 );
+
+-- =========================================================
+-- Datos de prueba para Incidencias, Reportes y Apelaciones
+-- =========================================================
+
+-- ======================
+-- Incidencia 1: Publicación bloqueada por sistema (3 reportes automáticos)
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision, auto_closed, moderator_comment)
+VALUES
+    (1, 'RESOLVED', (SELECT id FROM users WHERE username = 'JosueG'), 'REJECTED', TRUE, 'Producto con contenido inapropiado - bloqueado automáticamente por 3 reportes')
+ON CONFLICT DO NOTHING;
+
+-- Asegurar que el usuario system_user exista antes de insertar reportes del sistema
+INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at, location)
+SELECT
+    '9999999999',
+    'system_user',
+    crypt('system123', gen_salt('bf',12)),
+    'system@marketplace.local',
+    '+0000000000',
+    'System',
+    'Bot',
+    'OTHER',
+    'ACTIVE',
+    NOW(),
+    ST_SetSRID(ST_MakePoint(-78.62935, -1.24222), 4326)
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'system_user');
+
+-- Reportes del sistema para incidencia 1
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (1, (SELECT id FROM users WHERE username = 'system_user'), 'Contenido inapropiado', 'Detección automática de palabras prohibidas', 'SYSTEM'),
+    (1, (SELECT id FROM users WHERE username = 'system_user'), 'Información engañosa', 'Precio sospechoso detectado por algoritmo', 'SYSTEM'),
+    (1, (SELECT id FROM users WHERE username = 'system_user'), 'Imagen inapropiada', 'Imagen no cumple con políticas', 'SYSTEM')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 2: Reportada por usuarios, bajo revisión
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision)
+VALUES
+    (2, 'UNDER_REVIEW', (SELECT id FROM users WHERE username = 'JosueG'), 'PENDING')
+ON CONFLICT DO NOTHING;
+
+-- Reportes de usuarios para incidencia 2
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (2, (SELECT id FROM users WHERE username = 'DavidB'), 'Producto defectuoso', 'El producto no funciona como se describe', 'USER'),
+    (2, (SELECT id FROM users WHERE username = 'DavidM'), 'Precio incorrecto', 'El precio en la tienda física es diferente', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 3: Abierta, pendiente de asignación de moderador
+-- ======================
+INSERT INTO incidences (publication_id, status)
+VALUES
+    (3, 'OPEN')
+ON CONFLICT DO NOTHING;
+
+-- Reporte inicial para incidencia 3
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (3, (SELECT id FROM users WHERE username = 'DavidB'), 'Vendedor no responde', 'Intenté contactar al vendedor sin respuesta', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 4: Con apelación pendiente
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision)
+VALUES
+    (4, 'APPEALED', (SELECT id FROM users WHERE username = 'moderator_two'), 'REJECTED')
+ON CONFLICT DO NOTHING;
+
+-- Reportes para incidencia 4
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (4, (SELECT id FROM users WHERE username = 'DavidB'), 'Producto falsificado', 'La bicicleta parece ser una copia', 'USER'),
+    (4, (SELECT id FROM users WHERE username = 'DavidM'), 'Descripción engañosa', 'Las especificaciones no coinciden', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- Apelación del vendedor para incidencia 4
+INSERT INTO appeals (incidence_id, seller_id, reason, status, new_moderator_id)
+VALUES
+    (4, 
+     (SELECT id FROM users WHERE username = 'JoelB'), 
+     'Mi producto es auténtico. Tengo facturas y certificados de garantía que demuestran su originalidad. Los compradores malinterpretaron la descripción.',
+     'ASSIGNED',
+     (SELECT id FROM users WHERE username = 'moderator_three'))
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 5: Resuelta y aprobada
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision, moderator_comment)
+VALUES
+    (5, 'RESOLVED', (SELECT id FROM users WHERE username = 'moderator_three'), 'APPROVED', 'Reporte sin fundamento. Producto cumple con políticas.')
+ON CONFLICT DO NOTHING;
+
+-- Reporte sin fundamento para incidencia 5
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (5, (SELECT id FROM users WHERE username = 'DavidB'), 'No me gustó', 'El teclado no es de mi agrado', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 6: Con apelación rechazada (final)
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision, moderator_comment)
+VALUES
+    (1, 'RESOLVED', (SELECT id FROM users WHERE username = 'JosueG'), 'REJECTED', 'Después de revisar la apelación, se mantiene la decisión de bloqueo.')
+ON CONFLICT DO NOTHING;
+
+-- Apelación rechazada para incidencia 6
+INSERT INTO appeals (incidence_id, seller_id, reason, status, new_moderator_id, final_decision, final_decision_at)
+VALUES
+    (1,
+     (SELECT id FROM users WHERE username = 'JoelB'),
+     'Solicito revisión de mi caso. El bloqueo fue injusto ya que cumplí con todas las políticas.',
+     'REVIEWED',
+     (SELECT id FROM users WHERE username = 'moderator_three'),
+     'REJECTED',
+     NOW() - INTERVAL '2 days')
+ON CONFLICT DO NOTHING;
