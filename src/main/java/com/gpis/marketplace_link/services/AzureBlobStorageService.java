@@ -16,22 +16,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 
-/**
- * Servicio para gestionar archivos en Azure Blob Storage
- */
 @Slf4j
 @Service
 public class AzureBlobStorageService {
-
     @Value("${azure.storage.connection-string}")
     private String connectionString;
-
     @Value("${azure.storage.container-name}")
     private String containerName;
-
     @Value("${azure.storage.enabled:true}")
     private boolean azureStorageEnabled;
-
     private BlobServiceClient blobServiceClient;
     private BlobContainerClient containerClient;
 
@@ -73,13 +66,6 @@ public class AzureBlobStorageService {
         }
     }
 
-    /**
-     * Sube un archivo a Azure Blob Storage
-     * 
-     * @param file archivo a subir
-     * @param directory directorio dentro del contenedor (ej: "products", "profiles")
-     * @return URL pública del archivo subido
-     */
     public String uploadFile(MultipartFile file, String directory) throws IOException {
         if (!azureStorageEnabled) {
             throw new UnsupportedOperationException("Azure Storage está deshabilitado");
@@ -123,13 +109,6 @@ public class AzureBlobStorageService {
             throw new IOException("Error al subir archivo a Azure Storage", e);
         }
     }
-
-    /**
-     * Elimina un archivo de Azure Blob Storage
-     * 
-     * @param blobUrl URL completa del blob a eliminar
-     * @return true si se eliminó exitosamente
-     */
     public boolean deleteFile(String blobUrl) {
         if (!azureStorageEnabled) {
             return false;
@@ -155,13 +134,6 @@ public class AzureBlobStorageService {
             return false;
         }
     }
-
-    /**
-     * Verifica si un archivo existe en Azure Blob Storage
-     * 
-     * @param blobUrl URL del blob
-     * @return true si existe
-     */
     public boolean fileExists(String blobUrl) {
         if (!azureStorageEnabled) {
             return false;
@@ -176,11 +148,6 @@ public class AzureBlobStorageService {
             return false;
         }
     }
-
-    /**
-     * Extrae el nombre del blob de una URL completa
-     * Ejemplo: https://myaccount.blob.core.windows.net/container/products/abc-123.jpg -> products/abc-123.jpg
-     */
     private String extractBlobNameFromUrl(String blobUrl) {
         if (blobUrl == null || blobUrl.isEmpty()) {
             throw new IllegalArgumentException("La URL del blob no puede ser nula o vacía");
@@ -198,17 +165,9 @@ public class AzureBlobStorageService {
             throw new IllegalArgumentException("URL de blob inválida", e);
         }
     }
-
-    /**
-     * Obtiene la URL del contenedor
-     */
     public String getContainerUrl() {
         return containerClient != null ? containerClient.getBlobContainerUrl() : null;
     }
-
-    /**
-     * Verifica si Azure Storage está habilitado
-     */
     public boolean isEnabled() {
         return azureStorageEnabled;
     }
