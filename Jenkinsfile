@@ -419,6 +419,17 @@ pipeline {
                                 docker exec mplink_backend curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:8080/actuator/health 2>&1 || \
                                 echo "⚠️ curl falló - el backend puede no estar escuchando en 8080"
                             """
+                            
+                            // NUEVO: Probar el endpoint de login directamente
+                            echo "🔍 Probando endpoint de login directamente..."
+                            sh """
+                                docker run --rm --network ${backendNetwork} curlimages/curl:latest \
+                                    -X POST \
+                                    -H "Content-Type: application/json" \
+                                    -d '{"email":"test@example.com","password":"password123"}' \
+                                    -v \
+                                    http://mplink_backend:8080/api/auth/login 2>&1 | head -50
+                            """
                         }
                         
                         // Ejecutar cada colección dentro de un contenedor Docker
