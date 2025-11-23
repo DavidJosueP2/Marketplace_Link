@@ -2,6 +2,8 @@ package com.gpis.marketplace_link.security.filters;
 
 import com.gpis.marketplace_link.entities.User;
 import com.gpis.marketplace_link.security.user.CustomUserDetails;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -38,6 +40,7 @@ import java.util.Map;
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
 
     private final AuthenticationManager authenticationManager;
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     public JwtAuthenticationFilter(AuthenticationManager authenticationManager) {
         this.authenticationManager = authenticationManager;
@@ -64,19 +67,24 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             Map<String, String> creds = mapper.readValue(request.getInputStream(), new TypeReference<Map<String,String>>(){});
             email = creds.getOrDefault("email", creds.getOrDefault("username", null));
             password = creds.get("password");
+            log.debug("[JWT-LOGIN] JSON payload leído. email={}, passwordPresent={}", email, password != null && !password.isBlank());
         } catch (IOException e) {
+            log.warn("[JWT-LOGIN] Fallo leyendo JSON del body: {}. Intentando parámetros de formulario.", e.getMessage());
             // Intentar fallback con parámetros de formulario (por si el cuerpo estaba vacío o mal formateado)
             email = request.getParameter("email");
             if (email == null) {
                 email = request.getParameter("username");
             }
             password = request.getParameter("password");
+            log.debug("[JWT-LOGIN] Parámetros recibidos. email={}, passwordPresent={}", email, password != null && !password.isBlank());
         }
 
         if (email == null || password == null || email.isBlank() || password.isBlank()) {
+            log.error("[JWT-LOGIN] Credenciales faltantes o vacías. email={}, passwordNull={}", email, password == null);
             throw new AuthenticationServiceException("Missing credentials: email/password requeridos");
         }
 
+        log.info("[JWT-LOGIN] Intentando autenticación para email={}", email);
         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, password);
         return authenticationManager.authenticate(authenticationToken);
     }
