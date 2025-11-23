@@ -302,10 +302,35 @@ pipeline {
                         echo "📋 Encontradas ${collectionFiles.size()} colección(es) Postman"
                         collectionFiles.each { file -> echo "   - ${file}" }
                         
-                        // Si es modo local, el backend ya debería estar disponible (se levantó en Validación Local)
-                        // Solo verificamos rápidamente que esté disponible
+                        // Detectar si necesitamos usar la red Docker
+                        // Esto es necesario cuando:
+                        // 1. TEST_LOCAL_DOCKER está habilitado, O
+                        // 2. La URL es localhost y hay un contenedor Docker corriendo
                         def backendNetwork = 'mplink_net'
+                        def useDockerNetwork = false
+                        def backendContainerRunning = false
+                        
+                        // Verificar si el contenedor del backend está corriendo
+                        def containerStatus = sh(
+                            script: 'docker ps --filter "name=mplink_backend" --format "{{.Names}}" 2>/dev/null | head -1 || echo ""',
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (containerStatus == 'mplink_backend') {
+                            backendContainerRunning = true
+                            echo "🔍 Contenedor mplink_backend detectado corriendo"
+                        }
+                        
+                        // Determinar si debemos usar la red Docker
                         if (params.TEST_LOCAL_DOCKER) {
+                            useDockerNetwork = true
+                            echo "📍 Modo local: usando red Docker"
+                        } else if (testBaseUrl.contains('localhost') && backendContainerRunning) {
+                            useDockerNetwork = true
+                            echo "📍 URL localhost con contenedor Docker detectado: usando red Docker"
+                        }
+                        
+                        if (useDockerNetwork) {
                             echo "⏳ Verificando que el backend esté disponible..."
                             
                             // Verificar que la red existe, si no, intentar obtenerla del contenedor
@@ -342,9 +367,12 @@ pipeline {
                             }
                             echo "✅ Backend está disponible (HTTP ${httpCode})"
                             
-                            // Usar el nombre del contenedor como URL cuando esté en modo local
+                            // Usar el nombre del contenedor como URL cuando usamos la red Docker
                             testBaseUrl = 'http://mplink_backend:8080'
                             echo "🔄 Cambiando BASE_URL a: ${testBaseUrl} (nombre del contenedor)"
+                        } else if (testBaseUrl.contains('localhost') && !backendContainerRunning) {
+                            echo "⚠️ Advertencia: URL localhost pero no se detectó contenedor Docker corriendo"
+                            echo "   El contenedor de Newman intentará conectarse a localhost:8080 del host"
                         }
                         
                         echo "🚀 Ejecutando tests con Docker (postman/newman:latest)..."
@@ -360,11 +388,13 @@ pipeline {
                             echo "   USER_EMAIL: ${env.POSTMAN_USER_EMAIL}"
                             
                             // Ejecutar newman dentro de un contenedor Docker
-                            // Si es modo local, usar la misma red Docker que el backend
+                            // Usar la misma red Docker que el backend si está configurado
                             def dockerNetwork = ''
-                            if (params.TEST_LOCAL_DOCKER) {
+                            if (useDockerNetwork) {
                                 dockerNetwork = "--network ${backendNetwork}"
                                 echo "   Usando red Docker: ${backendNetwork}"
+                            } else {
+                                echo "   Ejecutando sin red Docker específica (modo remoto)"
                             }
                             
                             sh """
