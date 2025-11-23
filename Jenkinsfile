@@ -333,25 +333,37 @@ pipeline {
                         if (useDockerNetwork) {
                             echo "⏳ Verificando que el backend esté disponible..."
                             
-                            // Verificar que la red existe, si no, intentar obtenerla del contenedor
-                            def networkExists = sh(
-                                script: "docker network inspect ${backendNetwork} >/dev/null 2>&1 && echo 'exists' || echo 'notfound'",
+                            // Obtener la red directamente del contenedor
+                            // docker-compose crea redes con prefijo del directorio, así que buscamos por el contenedor
+                            // Método más confiable: obtener el ID de red del contenedor y luego el nombre
+                            def networkId = sh(
+                                script: 'docker inspect mplink_backend 2>/dev/null | grep -A 5 "Networks" | grep "NetworkID" | head -1 | cut -d\\" -f4 || echo ""',
                                 returnStdout: true
                             ).trim()
                             
-                            if (networkExists == 'notfound') {
-                                // Intentar obtener la red del contenedor
-                                def detectedNetwork = sh(
-                                    script: 'docker inspect mplink_backend --format="{{range \$k, \$v := .NetworkSettings.Networks}}{{\$k}}{{end}}" 2>/dev/null | head -1 || echo ""',
+                            def detectedNetwork = ''
+                            if (networkId && !networkId.isEmpty()) {
+                                detectedNetwork = sh(
+                                    script: "docker network inspect ${networkId} --format '{{.Name}}' 2>/dev/null || echo ''",
                                     returnStdout: true
                                 ).trim()
-                                
-                                if (detectedNetwork && !detectedNetwork.isEmpty()) {
-                                    backendNetwork = detectedNetwork
-                                    echo "🔍 Red detectada del contenedor: ${backendNetwork}"
-                                } else {
-                                    echo "⚠️ No se pudo detectar la red, usando: ${backendNetwork}"
-                                }
+                            }
+                            
+                            // Método alternativo: buscar redes que contengan "mplink" en el nombre
+                            if (!detectedNetwork || detectedNetwork.isEmpty()) {
+                                detectedNetwork = sh(
+                                    script: 'docker network ls --filter "name=mplink" --format "{{.Name}}" 2>/dev/null | head -1 || echo ""',
+                                    returnStdout: true
+                                ).trim()
+                            }
+                            
+                            if (detectedNetwork && !detectedNetwork.isEmpty()) {
+                                backendNetwork = detectedNetwork
+                                echo "🔍 Red detectada: ${backendNetwork}"
+                            } else {
+                                echo "⚠️ No se pudo detectar la red automáticamente"
+                                echo "   Intentando con el nombre por defecto: ${backendNetwork}"
+                                echo "   Si falla, verifica que el contenedor mplink_backend esté corriendo"
                             }
                             
                             echo "🔗 Red Docker del backend: ${backendNetwork}"
