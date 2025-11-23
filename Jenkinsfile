@@ -389,6 +389,28 @@ pipeline {
                         
                         echo "🚀 Ejecutando tests con Docker (postman/newman:latest)..."
                         
+                        // Mostrar logs del backend ANTES de ejecutar tests (para debugging)
+                        if (useDockerNetwork && backendContainerRunning) {
+                            echo "📋 === LOGS DEL BACKEND (últimas 50 líneas) ==="
+                            sh """
+                                docker logs --tail 50 mplink_backend 2>&1 || true
+                            """
+                            echo "📋 === FIN LOGS DEL BACKEND ==="
+                            
+                            // Verificar estado del contenedor
+                            echo "🔍 Estado del contenedor backend..."
+                            sh """
+                                docker inspect mplink_backend --format='{{.State.Status}}: {{.State.Health.Status}}' 2>/dev/null || echo "No disponible"
+                            """
+                            
+                            // Intentar conectarse al puerto 8080 desde dentro del contenedor
+                            echo "🔍 Verificando conectividad interna al puerto 8080..."
+                            sh """
+                                docker exec mplink_backend curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:8080/actuator/health 2>&1 || \
+                                echo "⚠️ curl falló - el backend puede no estar escuchando en 8080"
+                            """
+                        }
+                        
                         // Ejecutar cada colección dentro de un contenedor Docker
                         collectionFiles.each { collectionFile ->
                             def fileName = collectionFile.split('/').last()
