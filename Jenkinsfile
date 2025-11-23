@@ -30,24 +30,47 @@ pipeline {
                         script: "git rev-parse --short HEAD",
                         returnStdout: true
                     ).trim()
+                    
+                    // Detectar automáticamente el directorio base del proyecto
+                    // Si pom.xml está en la raíz, el workspace es back/
+                    // Si pom.xml está en back/, el workspace es la raíz del repo
+                    if (fileExists('pom.xml') && fileExists('Dockerfile')) {
+                        env.PROJECT_DIR = '.'
+                        echo "✅ Detectado: workspace es el directorio back/"
+                    } else if (fileExists('back/pom.xml') && fileExists('back/Dockerfile')) {
+                        env.PROJECT_DIR = 'back'
+                        echo "✅ Detectado: workspace es la raíz del repo, proyecto en back/"
+                    } else {
+                        echo "❌ No se pudo detectar la estructura del proyecto"
+                        echo "📁 Estructura del workspace:"
+                        sh 'pwd && ls -la || true'
+                        error("❌ No se encontró pom.xml o Dockerfile. Verifica la estructura del repositorio.")
+                    }
                 }
                 echo "Commit: ${env.GIT_COMMIT_SHORT}"
+                echo "Directorio del proyecto: ${env.PROJECT_DIR}"
             }
         }
 
         stage('Validación de Proyecto') {
             steps {
-                dir('back') {
-                    sh 'test -f pom.xml'
-                    sh 'test -f Dockerfile'
-                    sh 'echo "Validación OK"'
+                dir(env.PROJECT_DIR) {
+                    script {
+                        if (!fileExists('pom.xml')) {
+                            error("❌ No se encontró pom.xml en ${env.PROJECT_DIR}/")
+                        }
+                        if (!fileExists('Dockerfile')) {
+                            error("❌ No se encontró Dockerfile en ${env.PROJECT_DIR}/")
+                        }
+                        echo "✅ Validación OK: pom.xml y Dockerfile encontrados en ${env.PROJECT_DIR}/"
+                    }
                 }
             }
         }
 
         stage('Tests (Postman)') {
             steps {
-                dir('back') {
+                dir(env.PROJECT_DIR) {
                     script {
                         // Si existe una sola colección
                         if (fileExists('tests/postman_collection.json')) {
@@ -85,7 +108,7 @@ pipeline {
         stage('Construir Imagen Docker (con compilación)') {
             when { expression { params.BUILD_DOCKER } }
             steps {
-                dir('back') {
+                dir(env.PROJECT_DIR) {
                     script {
                         // Pasar metadatos de build a Docker
                         def buildDate = sh(script: 'date -u +"%Y-%m-%d"', returnStdout: true).trim()
@@ -124,7 +147,7 @@ pipeline {
                 } 
             }
             steps {
-                dir('back') {
+                dir(env.PROJECT_DIR) {
                     script {
                         // Detectar comando docker compose disponible (declarar una vez al inicio)
                         def dockerComposeCmd = sh(
