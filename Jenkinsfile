@@ -74,9 +74,23 @@ pipeline {
         }
 
         stage('Tests (Postman)') {
+            when { 
+                expression { 
+                    // Ejecutar tests solo si se construyó Docker o si hay una URL configurada
+                    params.BUILD_DOCKER || env.POSTMAN_BASE_URL != 'http://localhost:8080'
+                } 
+            }
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
+                        // Si TEST_LOCAL_DOCKER está habilitado, usar la URL local
+                        // Si no, usar la URL configurada (puede ser staging/production)
+                        def testBaseUrl = params.TEST_LOCAL_DOCKER ? 'http://localhost:8080' : env.POSTMAN_BASE_URL
+                        
+                        echo "🧪 Configuración de Tests Postman:"
+                        echo "   BASE_URL: ${testBaseUrl}"
+                        echo "   Modo: ${params.TEST_LOCAL_DOCKER ? 'Local (docker-compose)' : 'Remoto'}"
+                        
                         // Crear directorio target si no existe
                         sh 'mkdir -p target'
                         
@@ -101,6 +115,35 @@ pipeline {
                         
                         echo "📋 Encontradas ${collectionFiles.size()} colección(es) Postman"
                         collectionFiles.each { file -> echo "   - ${file}" }
+                        
+                        // Si es modo local, esperar a que el backend esté disponible
+                        if (params.TEST_LOCAL_DOCKER) {
+                            echo "⏳ Esperando a que el backend esté disponible..."
+                            def maxAttempts = 30
+                            def attempt = 0
+                            def backendReady = false
+                            
+                            while (attempt < maxAttempts && !backendReady) {
+                                def healthCheck = sh(
+                                    script: "curl -f -s http://localhost:8080/actuator/health 2>/dev/null || echo 'not-ready'",
+                                    returnStdout: true
+                                ).trim()
+                                
+                                if (healthCheck.contains('"status":"UP"') || healthCheck.contains('UP')) {
+                                    backendReady = true
+                                    echo "✅ Backend está disponible"
+                                } else {
+                                    attempt++
+                                    echo "   Intento ${attempt}/${maxAttempts} - Esperando backend..."
+                                    sleep(2)
+                                }
+                            }
+                            
+                            if (!backendReady) {
+                                error("❌ Timeout: El backend no está disponible después de ${maxAttempts} intentos")
+                            }
+                        }
+                        
                         echo "🚀 Ejecutando tests con Docker (postman/newman:latest)..."
                         
                         // Ejecutar cada colección dentro de un contenedor Docker
@@ -110,27 +153,27 @@ pipeline {
                             def outputFile = "target/newman-${baseName}.xml"
                             
                             echo "🔍 Ejecutando colección: ${collectionFile}"
-                            echo "   BASE_URL: ${env.POSTMAN_BASE_URL}"
+                            echo "   BASE_URL: ${testBaseUrl}"
                             echo "   USER_EMAIL: ${env.POSTMAN_USER_EMAIL}"
                             
                             // Ejecutar newman dentro de un contenedor Docker
-                            // Montamos el directorio actual para acceder a tests/ y target/
-                            // Pasamos variables de entorno necesarias para Postman
+                            // Si es modo local, usar network del host para acceder a localhost
+                            def dockerNetwork = params.TEST_LOCAL_DOCKER ? '--network host' : ''
+                            
                             sh """
-                                docker run --rm \
+                                docker run --rm ${dockerNetwork} \
                                     -v "\$(pwd):/workspace" \
                                     -w /workspace \
-                                    -e BASE_URL="${env.POSTMAN_BASE_URL}" \
+                                    -e BASE_URL="${testBaseUrl}" \
                                     -e USER_EMAIL="${env.POSTMAN_USER_EMAIL}" \
                                     -e USER_PASSWORD="${env.POSTMAN_USER_PASSWORD}" \
                                     postman/newman:latest \
                                     run "${collectionFile}" \
-                                    --env-var "BASE_URL=${env.POSTMAN_BASE_URL}" \
+                                    --env-var "BASE_URL=${testBaseUrl}" \
                                     --env-var "USER_EMAIL=${env.POSTMAN_USER_EMAIL}" \
                                     --env-var "USER_PASSWORD=${env.POSTMAN_USER_PASSWORD}" \
                                     --reporters cli,junit \
-                                    --reporter-junit-export "${outputFile}" \
-                                    --suppress-exit-code
+                                    --reporter-junit-export "${outputFile}"
                             """
                             
                             // Verificar que el archivo XML se generó
@@ -156,25 +199,35 @@ pipeline {
                         if (xmlFiles) {
                             echo "📊 Archivos de resultados encontrados:"
                             xmlFiles.split('\n').each { file ->
-                                echo "   - ${file}"
+                                // Limpiar el path (remover ./ si existe)
+                                def cleanFile = file.replaceFirst(/^\.\//, '')
+                                echo "   - ${cleanFile}"
                             }
-                            // JUnit necesita path relativo al workspace raíz
-                            def junitPath = "${env.PROJECT_DIR}/target/*.xml"
+                            
+                            // Construir path correcto para JUnit (sin ./ al inicio)
+                            // JUnit necesita path relativo al workspace raíz, sin ./
+                            def junitPath = "${env.PROJECT_DIR}/target/*.xml".replaceFirst(/^\.\//, '')
+                            
                             echo "📋 Publicando resultados JUnit desde: ${junitPath}"
-                            try {
+                            
+                            // Verificar que el directorio existe
+                            def targetExists = sh(
+                                script: "test -d ${env.PROJECT_DIR}/target && echo 'exists' || echo 'notfound'",
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (targetExists == 'exists') {
+                                // Listar archivos para confirmar
+                                sh "ls -lh ${env.PROJECT_DIR}/target/*.xml || true"
                                 junit junitPath
                                 echo "✅ Resultados JUnit publicados correctamente"
-                            } catch (Exception e) {
-                                echo "⚠️ Error al publicar resultados JUnit: ${e.getMessage()}"
-                                // Intentar con path absoluto
-                                def absPath = sh(script: "realpath ${env.PROJECT_DIR}/target/*.xml 2>/dev/null | head -1", returnStdout: true).trim()
-                                if (absPath) {
-                                    echo "📋 Intentando con path absoluto: ${absPath}"
-                                }
+                            } else {
+                                echo "⚠️ El directorio target no existe en ${env.PROJECT_DIR}/"
+                                sh "pwd && ls -la || true"
                             }
                         } else {
                             echo "⚠️ No se encontraron archivos XML de resultados en ${env.PROJECT_DIR}/target/"
-                            sh "ls -la ${env.PROJECT_DIR}/target/ || true"
+                            sh "ls -la ${env.PROJECT_DIR}/target/ 2>/dev/null || echo 'Directorio no encontrado'"
                         }
                     }
                 }
@@ -201,17 +254,8 @@ pipeline {
                                 -t ${env.DOCKER_IMAGE}:latest \
                                 .
                         """
+                        echo "✅ Imagen Docker construida: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
                     }
-                }
-            }
-        }
-
-        stage('Push Imagen') {
-            when { expression { params.PUSH_DOCKER && params.BUILD_DOCKER } }
-            steps {
-                withDockerRegistry([credentialsId: 'docker-registry-credentials', url: 'https://index.docker.io/v1/']) {
-                    sh "docker push ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
-                    sh "docker push ${env.DOCKER_IMAGE}:latest"
                 }
             }
         }
@@ -316,15 +360,20 @@ pipeline {
                                 ${dockerComposeCmd} logs mplink_postgres || true
                             """
                             throw e
-                        } finally {
-                            echo "🧹 Limpiando contenedores de prueba..."
-                            sh """
-                                ${dockerComposeCmd} down -v 2>/dev/null || true
-                                # Limpiar imágenes dangling si las hay
-                                docker image prune -f || true
-                            """
                         }
+                        // NO limpiar contenedores aquí - los tests Postman los necesitan
+                        // Se limpiarán después de los tests
                     }
+                }
+            }
+        }
+
+        stage('Push Imagen') {
+            when { expression { params.PUSH_DOCKER && params.BUILD_DOCKER } }
+            steps {
+                withDockerRegistry([credentialsId: 'docker-registry-credentials', url: 'https://index.docker.io/v1/']) {
+                    sh "docker push ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
+                    sh "docker push ${env.DOCKER_IMAGE}:latest"
                 }
             }
         }
@@ -344,6 +393,31 @@ pipeline {
                             --resource-group mi-grupo \
                             --image ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}
                     """
+                }
+            }
+        }
+        
+        stage('Limpiar Contenedores de Prueba') {
+            when { 
+                expression { 
+                    params.TEST_LOCAL_DOCKER && params.BUILD_DOCKER 
+                } 
+            }
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        def dockerComposeCmd = sh(
+                            script: 'command -v docker-compose >/dev/null 2>&1 && echo "docker-compose" || echo "docker compose"',
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "🧹 Limpiando contenedores de prueba..."
+                        sh """
+                            ${dockerComposeCmd} down -v 2>/dev/null || true
+                            # Limpiar imágenes dangling si las hay
+                            docker image prune -f || true
+                        """
+                    }
                 }
             }
         }
