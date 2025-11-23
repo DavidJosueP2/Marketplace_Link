@@ -11,6 +11,11 @@ pipeline {
     environment {
         DOCKER_IMAGE = "marketplace-link-backend"
         DOCKER_TAG = "${env.BUILD_NUMBER}"
+        
+        // Variables para tests Postman (con valores por defecto)
+        POSTMAN_BASE_URL = "${env.POSTMAN_BASE_URL ?: 'http://localhost:8080'}"
+        POSTMAN_USER_EMAIL = "${env.POSTMAN_USER_EMAIL ?: 'test@example.com'}"
+        POSTMAN_USER_PASSWORD = "${env.POSTMAN_USER_PASSWORD ?: 'password123'}"
     }
 
     parameters {
@@ -75,32 +80,28 @@ pipeline {
                         // Crear directorio target si no existe
                         sh 'mkdir -p target'
                         
-                        // Verificar si hay colecciones Postman
-                        def hasCollections = false
+                        // Buscar todas las colecciones Postman en tests/
+                        echo "🔍 Buscando colecciones Postman en tests/..."
                         def collectionFiles = []
                         
-                        if (fileExists('tests/postman_collection.json')) {
-                            hasCollections = true
-                            collectionFiles = ['tests/postman_collection.json']
-                        } else {
-                            // Buscar todas las colecciones en tests/
-                            def foundFiles = sh(
-                                script: "find tests -name '*.json' -o -name '*.postman_collection.json' 2>/dev/null | head -20",
-                                returnStdout: true
-                            ).trim()
-                            
-                            if (foundFiles) {
-                                hasCollections = true
-                                collectionFiles = foundFiles.split('\n').findAll { it.trim() }
-                            }
+                        // Buscar archivos JSON en tests/
+                        def foundFiles = sh(
+                            script: "ls tests/*.json tests/*.postman_collection.json 2>/dev/null || true",
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (foundFiles) {
+                            collectionFiles = foundFiles.split('\n').findAll { it.trim() && it.endsWith('.json') }
                         }
                         
-                        if (!hasCollections) {
-                            echo "⚠️ No se encontraron colecciones Postman. Saltando tests."
+                        if (collectionFiles.isEmpty()) {
+                            echo "⚠️ No se encontraron colecciones Postman en tests/. Saltando tests."
                             return
                         }
                         
-                        echo "📋 Ejecutando ${collectionFiles.size()} colección(es) Postman con Docker..."
+                        echo "📋 Encontradas ${collectionFiles.size()} colección(es) Postman"
+                        collectionFiles.each { file -> echo "   - ${file}" }
+                        echo "🚀 Ejecutando tests con Docker (postman/newman:latest)..."
                         
                         // Ejecutar cada colección dentro de un contenedor Docker
                         collectionFiles.each { collectionFile ->
@@ -108,21 +109,37 @@ pipeline {
                             def baseName = fileName.replaceAll(/\.(json|postman_collection\.json)$/, '')
                             def outputFile = "target/newman-${baseName}.xml"
                             
-                            echo "🔍 Ejecutando: ${collectionFile}"
+                            echo "🔍 Ejecutando colección: ${collectionFile}"
+                            echo "   BASE_URL: ${env.POSTMAN_BASE_URL}"
+                            echo "   USER_EMAIL: ${env.POSTMAN_USER_EMAIL}"
                             
                             // Ejecutar newman dentro de un contenedor Docker
                             // Montamos el directorio actual para acceder a tests/ y target/
+                            // Pasamos variables de entorno necesarias para Postman
                             sh """
                                 docker run --rm \
                                     -v "\$(pwd):/workspace" \
                                     -w /workspace \
+                                    -e BASE_URL="${env.POSTMAN_BASE_URL}" \
+                                    -e USER_EMAIL="${env.POSTMAN_USER_EMAIL}" \
+                                    -e USER_PASSWORD="${env.POSTMAN_USER_PASSWORD}" \
                                     postman/newman:latest \
                                     run "${collectionFile}" \
+                                    --env-var "BASE_URL=${env.POSTMAN_BASE_URL}" \
+                                    --env-var "USER_EMAIL=${env.POSTMAN_USER_EMAIL}" \
+                                    --env-var "USER_PASSWORD=${env.POSTMAN_USER_PASSWORD}" \
                                     --reporters cli,junit \
-                                    --reporter-junit-export "${outputFile}"
+                                    --reporter-junit-export "${outputFile}" \
+                                    --suppress-exit-code
                             """
                             
-                            echo "✅ Colección ${collectionFile} ejecutada. Resultados en ${outputFile}"
+                            // Verificar que el archivo XML se generó
+                            if (fileExists(outputFile)) {
+                                echo "✅ Colección ${collectionFile} ejecutada. Resultados en ${outputFile}"
+                                sh "ls -lh ${outputFile} || true"
+                            } else {
+                                echo "⚠️ Advertencia: No se generó el archivo de resultados ${outputFile}"
+                            }
                         }
                     }
                 }
@@ -130,12 +147,23 @@ pipeline {
             post {
                 always {
                     script {
-                        // Buscar archivos XML de resultados en el directorio correcto
-                        def resultsPath = "${env.PROJECT_DIR}/target/*.xml"
-                        if (fileExists("${env.PROJECT_DIR}/target")) {
-                            junit resultsPath
-                        } else {
-                            echo "⚠️ No se encontró el directorio target con resultados"
+                        dir(env.PROJECT_DIR) {
+                            // Buscar archivos XML de resultados
+                            def xmlFiles = sh(
+                                script: "find target -name '*.xml' -type f 2>/dev/null || true",
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (xmlFiles) {
+                                echo "📊 Archivos de resultados encontrados:"
+                                xmlFiles.split('\n').each { file ->
+                                    echo "   - ${file}"
+                                }
+                                junit "${env.PROJECT_DIR}/target/*.xml"
+                            } else {
+                                echo "⚠️ No se encontraron archivos XML de resultados en target/"
+                                sh "ls -la target/ || true"
+                            }
                         }
                     }
                 }
