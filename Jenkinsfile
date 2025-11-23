@@ -83,16 +83,16 @@ pipeline {
                         def buildTime = sh(script: 'date -u +"%H:%M:%S"', returnStdout: true).trim()
                         def gitCommit = env.GIT_COMMIT_SHORT ?: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         
-                        sh """
-                            docker build \
+                    sh """
+                        docker build \
                                 --build-arg BUILD_DATE="${buildDate}" \
                                 --build-arg BUILD_TIME="${buildTime}" \
                                 --build-arg GIT_COMMIT="${gitCommit}" \
                                 --build-arg VERSION="${env.BUILD_NUMBER}" \
-                                -t ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} \
-                                -t ${env.DOCKER_IMAGE}:latest \
-                                .
-                        """
+                            -t ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} \
+                            -t ${env.DOCKER_IMAGE}:latest \
+                            .
+                    """
                         echo "✅ Imagen Docker construida: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
                     }
                 }
@@ -118,11 +118,15 @@ pipeline {
                             echo "🚀 Levantando servicios con docker-compose para validación..."
                             echo "Usando comando: ${dockerComposeCmd}"
                             
+                            // Determinar qué docker-compose usar (raíz del proyecto o back/)
+                            def composeFile = fileExists('../docker-compose.yml') ? '../docker-compose.yml' : 'docker-compose.yml'
+                            echo "📁 Usando docker-compose: ${composeFile}"
+                            
                             // Limpiar contenedores previos si existen
                             sh """
-                                ${dockerComposeCmd} down -v 2>/dev/null || true
-                                docker stop mplink_backend mplink_marketplace_db mplink_marketplace_test_db 2>/dev/null || true
-                                docker rm mplink_backend mplink_marketplace_db mplink_marketplace_test_db 2>/dev/null || true
+                                ${dockerComposeCmd} -f ${composeFile} down -v 2>/dev/null || true
+                                docker stop mplink_backend mplink_marketplace_db mplink_marketplace_test_db mplink_postgres mplink_postgres_test 2>/dev/null || true
+                                docker rm mplink_backend mplink_marketplace_db mplink_marketplace_test_db mplink_postgres mplink_postgres_test 2>/dev/null || true
                             """
                             
                             // Etiquetar la imagen construida para que docker-compose la use
@@ -131,19 +135,29 @@ pipeline {
                             """
                             
                             // Levantar solo backend y BD (sin frontend para pruebas más rápidas)
+                            // Usar el docker-compose desde la ubicación correcta
+                            def composeDir = fileExists('../docker-compose.yml') ? '..' : '.'
+                            dir(composeDir) {
                             sh """
-                                ${dockerComposeCmd} up -d mplink_postgres mplink_postgres_test mplink_backend
+                                    ${dockerComposeCmd} -f ${composeFile} up -d mplink_postgres mplink_postgres_test mplink_backend
                             """
+                            }
                             
                             echo "⏳ Esperando a que los servicios estén saludables..."
                             
                             // Esperar a que la BD esté lista (máximo 60 segundos)
+                            // Intentar con ambos nombres de contenedor posibles
                             sh '''
                                 timeout=60
                                 elapsed=0
-                                until docker exec mplink_marketplace_db pg_isready -U postgres -d marketplace_db > /dev/null 2>&1; do
+                                db_ready=false
+                                
+                                # Intentar con mplink_marketplace_db (back/docker-compose.yml)
+                                until docker exec mplink_marketplace_db pg_isready -U postgres -d marketplace_db > /dev/null 2>&1 2>/dev/null || \
+                                      docker exec mplink_postgres pg_isready -U mplink_user -d marketplace_link > /dev/null 2>&1; do
                                     if [ $elapsed -ge $timeout ]; then
                                         echo "❌ Timeout esperando la base de datos"
+                                        docker ps -a | grep postgres || true
                                         exit 1
                                     fi
                                     echo "Esperando base de datos... ($elapsed/$timeout segundos)"
@@ -153,21 +167,43 @@ pipeline {
                                 echo "✅ Base de datos lista"
                             '''
                             
-                            // Esperar a que el backend esté saludable (máximo 120 segundos)
+                            // Esperar a que el backend esté saludable usando el healthcheck de Docker
+                            echo "⏳ Esperando a que el backend esté saludable (usando healthcheck de Docker)..."
                             sh """
-                                timeout=120
+                                timeout=180
                                 elapsed=0
-                                until curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; do
-                                    if [ \$elapsed -ge \$timeout ]; then
-                                        echo "❌ Timeout esperando el backend"
-                                        ${dockerComposeCmd} logs backend
-                                        exit 1
+                                backend_healthy=false
+                                
+                                while [ \$elapsed -lt \$timeout ]; do
+                                    # Verificar healthcheck de Docker
+                                    health_status=\$(docker inspect --format='{{.State.Health.Status}}' mplink_backend 2>/dev/null || echo "none")
+                                    
+                                    if [ "\$health_status" = "healthy" ]; then
+                                        echo "✅ Backend está healthy según Docker"
+                                        backend_healthy=true
+                                        break
                                     fi
-                                    echo "Esperando backend... (\$elapsed/\$timeout segundos)"
-                                    sleep 3
-                                    elapsed=\$((elapsed + 3))
+                                    
+                                    # También intentar curl directamente
+                                    if curl -f -s http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                                        echo "✅ Backend responde al health check"
+                                        backend_healthy=true
+                                        break
+                                    fi
+                                    
+                                    echo "Esperando backend... (\$elapsed/\$timeout segundos) - Estado: \$health_status"
+                                    sleep 5
+                                    elapsed=\$((elapsed + 5))
                                 done
-                                echo "✅ Backend saludable"
+                                
+                                if [ "\$backend_healthy" != "true" ]; then
+                                    echo "❌ Timeout esperando el backend"
+                                    echo "=== Estado de contenedores ==="
+                                    docker ps -a | grep mplink || true
+                                    echo "=== Logs del Backend ==="
+                                    ${dockerComposeCmd} -f ${composeFile} logs mplink_backend || docker logs mplink_backend || true
+                                    exit 1
+                                fi
                             """
                             
                             // Validar que el health check responde correctamente
@@ -179,7 +215,7 @@ pipeline {
                             
                             echo "Health check response: ${healthResponse}"
                             
-                            if (!healthResponse.contains('"status":"UP"')) {
+                            if (!healthResponse.contains('"status":"UP"') && !healthResponse.contains('UP')) {
                                 error("❌ Health check no está UP. Response: ${healthResponse}")
                             }
                             
@@ -192,11 +228,14 @@ pipeline {
                         } catch (Exception e) {
                             echo "❌ Error durante la validación local: ${e.getMessage()}"
                             // Mostrar logs en caso de error
+                            def composeFile = fileExists('../docker-compose.yml') ? '../docker-compose.yml' : 'docker-compose.yml'
                             sh """
+                                echo "=== Estado de contenedores ==="
+                                docker ps -a | grep mplink || true
                                 echo "=== Logs del Backend ==="
-                                ${dockerComposeCmd} logs backend || true
+                                ${dockerComposeCmd} -f ${composeFile} logs mplink_backend || docker logs mplink_backend || true
                                 echo "=== Logs de la Base de Datos ==="
-                                ${dockerComposeCmd} logs mplink_postgres || true
+                                ${dockerComposeCmd} -f ${composeFile} logs mplink_postgres || docker logs mplink_postgres || docker logs mplink_marketplace_db || true
                             """
                             throw e
                         }
@@ -391,16 +430,20 @@ pipeline {
                 } 
             }
             steps {
-                dir(env.PROJECT_DIR) {
-                    script {
-                        def dockerComposeCmd = sh(
-                            script: 'command -v docker-compose >/dev/null 2>&1 && echo "docker-compose" || echo "docker compose"',
-                            returnStdout: true
-                        ).trim()
-                        
-                        echo "🧹 Limpiando contenedores de prueba..."
+                script {
+                    def dockerComposeCmd = sh(
+                        script: 'command -v docker-compose >/dev/null 2>&1 && echo "docker-compose" || echo "docker compose"',
+                        returnStdout: true
+                    ).trim()
+                    
+                    // Determinar qué docker-compose usar
+                    def composeFile = fileExists("${env.PROJECT_DIR}/../docker-compose.yml") ? "${env.PROJECT_DIR}/../docker-compose.yml" : "${env.PROJECT_DIR}/docker-compose.yml"
+                    def composeDir = fileExists("${env.PROJECT_DIR}/../docker-compose.yml") ? ".." : env.PROJECT_DIR
+                    
+                    echo "🧹 Limpiando contenedores de prueba..."
+                    dir(composeDir) {
                         sh """
-                            ${dockerComposeCmd} down -v 2>/dev/null || true
+                            ${dockerComposeCmd} -f ${composeFile} down -v 2>/dev/null || true
                             # Limpiar imágenes dangling si las hay
                             docker image prune -f || true
                         """
