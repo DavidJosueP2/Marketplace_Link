@@ -72,35 +72,72 @@ pipeline {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        // Si existe una sola colección
+                        // Crear directorio target si no existe
+                        sh 'mkdir -p target'
+                        
+                        // Verificar si hay colecciones Postman
+                        def hasCollections = false
+                        def collectionFiles = []
+                        
                         if (fileExists('tests/postman_collection.json')) {
-                            sh """
-                                newman run tests/postman_collection.json \
-                                --reporters cli,junit \
-                                --reporter-junit-export target/newman-results.xml
-                            """
-                        } 
-                        // Si existen varias colecciones
-                        else if (sh(script: "ls tests/*.json 2>/dev/null | wc -l", returnStdout: true).trim() != "0") {
-                            sh """
-                                for c in tests/*.json; do
-                                  echo "Ejecutando colección: \$c"
-                                  newman run "\$c" \
-                                    --reporters cli,junit \
-                                    --reporter-junit-export "target/newman-\$(basename \$c).xml"
-                                done
-                            """
-                        } 
-                        // Si no hay colecciones
-                        else {
+                            hasCollections = true
+                            collectionFiles = ['tests/postman_collection.json']
+                        } else {
+                            // Buscar todas las colecciones en tests/
+                            def foundFiles = sh(
+                                script: "find tests -name '*.json' -o -name '*.postman_collection.json' 2>/dev/null | head -20",
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (foundFiles) {
+                                hasCollections = true
+                                collectionFiles = foundFiles.split('\n').findAll { it.trim() }
+                            }
+                        }
+                        
+                        if (!hasCollections) {
                             echo "⚠️ No se encontraron colecciones Postman. Saltando tests."
+                            return
+                        }
+                        
+                        echo "📋 Ejecutando ${collectionFiles.size()} colección(es) Postman con Docker..."
+                        
+                        // Ejecutar cada colección dentro de un contenedor Docker
+                        collectionFiles.each { collectionFile ->
+                            def fileName = collectionFile.split('/').last()
+                            def baseName = fileName.replaceAll(/\.(json|postman_collection\.json)$/, '')
+                            def outputFile = "target/newman-${baseName}.xml"
+                            
+                            echo "🔍 Ejecutando: ${collectionFile}"
+                            
+                            // Ejecutar newman dentro de un contenedor Docker
+                            // Montamos el directorio actual para acceder a tests/ y target/
+                            sh """
+                                docker run --rm \
+                                    -v "\$(pwd):/workspace" \
+                                    -w /workspace \
+                                    postman/newman:latest \
+                                    run "${collectionFile}" \
+                                    --reporters cli,junit \
+                                    --reporter-junit-export "${outputFile}"
+                            """
+                            
+                            echo "✅ Colección ${collectionFile} ejecutada. Resultados en ${outputFile}"
                         }
                     }
                 }
             }
             post {
                 always {
-                    junit 'back/target/*.xml'
+                    script {
+                        // Buscar archivos XML de resultados en el directorio correcto
+                        def resultsPath = "${env.PROJECT_DIR}/target/*.xml"
+                        if (fileExists("${env.PROJECT_DIR}/target")) {
+                            junit resultsPath
+                        } else {
+                            echo "⚠️ No se encontró el directorio target con resultados"
+                        }
+                    }
                 }
             }
         }
