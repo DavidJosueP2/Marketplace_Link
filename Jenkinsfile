@@ -73,6 +73,140 @@ pipeline {
             }
         }
 
+        stage('Construir Imagen Docker (con compilación)') {
+            when { expression { params.BUILD_DOCKER } }
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        // Pasar metadatos de build a Docker
+                        def buildDate = sh(script: 'date -u +"%Y-%m-%d"', returnStdout: true).trim()
+                        def buildTime = sh(script: 'date -u +"%H:%M:%S"', returnStdout: true).trim()
+                        def gitCommit = env.GIT_COMMIT_SHORT ?: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        
+                        sh """
+                            docker build \
+                                --build-arg BUILD_DATE="${buildDate}" \
+                                --build-arg BUILD_TIME="${buildTime}" \
+                                --build-arg GIT_COMMIT="${gitCommit}" \
+                                --build-arg VERSION="${env.BUILD_NUMBER}" \
+                                -t ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} \
+                                -t ${env.DOCKER_IMAGE}:latest \
+                                .
+                        """
+                        echo "✅ Imagen Docker construida: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
+                    }
+                }
+            }
+        }
+
+        stage('Validación Local (Docker Compose)') {
+            when { 
+                expression { 
+                    params.TEST_LOCAL_DOCKER && params.BUILD_DOCKER 
+                } 
+            }
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        // Detectar comando docker compose disponible (declarar una vez al inicio)
+                        def dockerComposeCmd = sh(
+                            script: 'command -v docker-compose >/dev/null 2>&1 && echo "docker-compose" || echo "docker compose"',
+                            returnStdout: true
+                        ).trim()
+                        
+                        try {
+                            echo "🚀 Levantando servicios con docker-compose para validación..."
+                            echo "Usando comando: ${dockerComposeCmd}"
+                            
+                            // Limpiar contenedores previos si existen
+                            sh """
+                                ${dockerComposeCmd} down -v 2>/dev/null || true
+                                docker stop mplink_backend mplink_marketplace_db mplink_marketplace_test_db 2>/dev/null || true
+                                docker rm mplink_backend mplink_marketplace_db mplink_marketplace_test_db 2>/dev/null || true
+                            """
+                            
+                            // Etiquetar la imagen construida para que docker-compose la use
+                            sh """
+                                docker tag ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} mplink_backend:latest
+                            """
+                            
+                            // Levantar solo backend y BD (sin frontend para pruebas más rápidas)
+                            sh """
+                                ${dockerComposeCmd} up -d mplink_postgres mplink_postgres_test mplink_backend
+                            """
+                            
+                            echo "⏳ Esperando a que los servicios estén saludables..."
+                            
+                            // Esperar a que la BD esté lista (máximo 60 segundos)
+                            sh '''
+                                timeout=60
+                                elapsed=0
+                                until docker exec mplink_marketplace_db pg_isready -U postgres -d marketplace_db > /dev/null 2>&1; do
+                                    if [ $elapsed -ge $timeout ]; then
+                                        echo "❌ Timeout esperando la base de datos"
+                                        exit 1
+                                    fi
+                                    echo "Esperando base de datos... ($elapsed/$timeout segundos)"
+                                    sleep 2
+                                    elapsed=$((elapsed + 2))
+                                done
+                                echo "✅ Base de datos lista"
+                            '''
+                            
+                            // Esperar a que el backend esté saludable (máximo 120 segundos)
+                            sh """
+                                timeout=120
+                                elapsed=0
+                                until curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; do
+                                    if [ \$elapsed -ge \$timeout ]; then
+                                        echo "❌ Timeout esperando el backend"
+                                        ${dockerComposeCmd} logs backend
+                                        exit 1
+                                    fi
+                                    echo "Esperando backend... (\$elapsed/\$timeout segundos)"
+                                    sleep 3
+                                    elapsed=\$((elapsed + 3))
+                                done
+                                echo "✅ Backend saludable"
+                            """
+                            
+                            // Validar que el health check responde correctamente
+                            echo "🔍 Verificando health check del backend..."
+                            def healthResponse = sh(
+                                script: 'curl -s http://localhost:8080/actuator/health',
+                                returnStdout: true
+                            ).trim()
+                            
+                            echo "Health check response: ${healthResponse}"
+                            
+                            if (!healthResponse.contains('"status":"UP"')) {
+                                error("❌ Health check no está UP. Response: ${healthResponse}")
+                            }
+                            
+                            // Test adicional: verificar que la API responde
+                            echo "🔍 Verificando que la API está respondiendo..."
+                            sh 'curl -f http://localhost:8080/actuator/health || exit 1'
+                            
+                            echo "✅ Validación local completada exitosamente"
+                            
+                        } catch (Exception e) {
+                            echo "❌ Error durante la validación local: ${e.getMessage()}"
+                            // Mostrar logs en caso de error
+                            sh """
+                                echo "=== Logs del Backend ==="
+                                ${dockerComposeCmd} logs backend || true
+                                echo "=== Logs de la Base de Datos ==="
+                                ${dockerComposeCmd} logs mplink_postgres || true
+                            """
+                            throw e
+                        }
+                        // NO limpiar contenedores aquí - los tests Postman los necesitan
+                        // Se limpiarán después de los tests
+                    }
+                }
+            }
+        }
+
         stage('Tests (Postman)') {
             when { 
                 expression { 
@@ -116,32 +250,19 @@ pipeline {
                         echo "📋 Encontradas ${collectionFiles.size()} colección(es) Postman"
                         collectionFiles.each { file -> echo "   - ${file}" }
                         
-                        // Si es modo local, esperar a que el backend esté disponible
+                        // Si es modo local, el backend ya debería estar disponible (se levantó en Validación Local)
+                        // Solo verificamos rápidamente que esté disponible
                         if (params.TEST_LOCAL_DOCKER) {
-                            echo "⏳ Esperando a que el backend esté disponible..."
-                            def maxAttempts = 30
-                            def attempt = 0
-                            def backendReady = false
+                            echo "⏳ Verificando que el backend esté disponible..."
+                            def healthCheck = sh(
+                                script: "curl -f -s http://localhost:8080/actuator/health 2>/dev/null || echo 'not-ready'",
+                                returnStdout: true
+                            ).trim()
                             
-                            while (attempt < maxAttempts && !backendReady) {
-                                def healthCheck = sh(
-                                    script: "curl -f -s http://localhost:8080/actuator/health 2>/dev/null || echo 'not-ready'",
-                                    returnStdout: true
-                                ).trim()
-                                
-                                if (healthCheck.contains('"status":"UP"') || healthCheck.contains('UP')) {
-                                    backendReady = true
-                                    echo "✅ Backend está disponible"
-                                } else {
-                                    attempt++
-                                    echo "   Intento ${attempt}/${maxAttempts} - Esperando backend..."
-                                    sleep(2)
-                                }
+                            if (!healthCheck.contains('"status":"UP"') && !healthCheck.contains('UP')) {
+                                error("❌ El backend no está disponible. Health check: ${healthCheck}")
                             }
-                            
-                            if (!backendReady) {
-                                error("❌ Timeout: El backend no está disponible después de ${maxAttempts} intentos")
-                            }
+                            echo "✅ Backend está disponible"
                         }
                         
                         echo "🚀 Ejecutando tests con Docker (postman/newman:latest)..."
@@ -234,33 +355,7 @@ pipeline {
             }
         }
 
-        stage('Construir Imagen Docker (con compilación)') {
-            when { expression { params.BUILD_DOCKER } }
-            steps {
-                dir(env.PROJECT_DIR) {
-                    script {
-                        // Pasar metadatos de build a Docker
-                        def buildDate = sh(script: 'date -u +"%Y-%m-%d"', returnStdout: true).trim()
-                        def buildTime = sh(script: 'date -u +"%H:%M:%S"', returnStdout: true).trim()
-                        def gitCommit = env.GIT_COMMIT_SHORT ?: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        
-                        sh """
-                            docker build \
-                                --build-arg BUILD_DATE="${buildDate}" \
-                                --build-arg BUILD_TIME="${buildTime}" \
-                                --build-arg GIT_COMMIT="${gitCommit}" \
-                                --build-arg VERSION="${env.BUILD_NUMBER}" \
-                                -t ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} \
-                                -t ${env.DOCKER_IMAGE}:latest \
-                                .
-                        """
-                        echo "✅ Imagen Docker construida: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
-                    }
-                }
-            }
-        }
-
-        stage('Validación Local (Docker Compose)') {
+        stage('Push Imagen') {
             when { 
                 expression { 
                     params.TEST_LOCAL_DOCKER && params.BUILD_DOCKER 
