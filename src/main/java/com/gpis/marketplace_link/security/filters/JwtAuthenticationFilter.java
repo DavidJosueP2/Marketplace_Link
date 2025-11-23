@@ -58,6 +58,11 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
             throws AuthenticationException {
+        log.info("[JWT-LOGIN] ========== INICIO attemptAuthentication ==========");
+        log.info("[JWT-LOGIN] Content-Type: {}", request.getContentType());
+        log.info("[JWT-LOGIN] Method: {}", request.getMethod());
+        log.info("[JWT-LOGIN] Request URI: {}", request.getRequestURI());
+        
         String email = null;
         String password = null;
 
@@ -67,26 +72,38 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             Map<String, String> creds = mapper.readValue(request.getInputStream(), new TypeReference<Map<String,String>>(){});
             email = creds.getOrDefault("email", creds.getOrDefault("username", null));
             password = creds.get("password");
-            log.debug("[JWT-LOGIN] JSON payload leído. email={}, passwordPresent={}", email, password != null && !password.isBlank());
+            log.info("[JWT-LOGIN] JSON payload leído exitosamente. email={}, passwordPresent={}", email, password != null && !password.isBlank());
         } catch (IOException e) {
-            log.warn("[JWT-LOGIN] Fallo leyendo JSON del body: {}. Intentando parámetros de formulario.", e.getMessage());
+            log.error("[JWT-LOGIN] ❌ Fallo leyendo JSON del body: {}", e.getMessage(), e);
+            log.warn("[JWT-LOGIN] Intentando parámetros de formulario como fallback...");
             // Intentar fallback con parámetros de formulario (por si el cuerpo estaba vacío o mal formateado)
             email = request.getParameter("email");
             if (email == null) {
                 email = request.getParameter("username");
             }
             password = request.getParameter("password");
-            log.debug("[JWT-LOGIN] Parámetros recibidos. email={}, passwordPresent={}", email, password != null && !password.isBlank());
+            log.info("[JWT-LOGIN] Parámetros recibidos. email={}, passwordPresent={}", email, password != null && !password.isBlank());
         }
 
         if (email == null || password == null || email.isBlank() || password.isBlank()) {
-            log.error("[JWT-LOGIN] Credenciales faltantes o vacías. email={}, passwordNull={}", email, password == null);
+            log.error("[JWT-LOGIN] ❌ Credenciales faltantes o vacías. email={}, passwordNull={}, emailBlank={}", 
+                email, password == null, email != null && email.isBlank());
             throw new AuthenticationServiceException("Missing credentials: email/password requeridos");
         }
 
-        log.info("[JWT-LOGIN] Intentando autenticación para email={}", email);
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, password);
-        return authenticationManager.authenticate(authenticationToken);
+        log.info("[JWT-LOGIN] ✅ Intentando autenticación para email={}", email);
+        try {
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(email, password);
+            Authentication result = authenticationManager.authenticate(authenticationToken);
+            log.info("[JWT-LOGIN] ✅ Autenticación exitosa para email={}", email);
+            return result;
+        } catch (AuthenticationException e) {
+            log.error("[JWT-LOGIN] ❌ Fallo de autenticación para email={}: {}", email, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("[JWT-LOGIN] ❌ Excepción inesperada durante autenticación para email={}", email, e);
+            throw new AuthenticationServiceException("Error inesperado durante autenticación", e);
+        }
     }
 
     /**
