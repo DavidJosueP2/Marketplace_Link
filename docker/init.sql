@@ -338,26 +338,11 @@ INSERT INTO categories (name) VALUES
 -- NOTA: Usando coordenadas ficticias
 INSERT INTO publications (code, type, name, description, price, availability, status, location, category_id, vendor_id, working_hours)
 VALUES
-    ('PRD004', 'PRODUCT', 'Laptop Pro 15"', 'Laptop con procesador i7 y 16GB RAM', 1099.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.615124, -1.270321), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD005', 'PRODUCT', 'Televisor 55"', 'Smart TV 4K UHD con HDR10+', 799.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.610052, -1.265012), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD006', 'PRODUCT', 'Auriculares Bluetooth', 'Auriculares inalámbricos con cancelación de ruido', 129.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.617845, -1.264500), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD007', 'PRODUCT', 'Mouse Gamer RGB', 'Mouse ergonómico con luces RGB y 6 botones', 39.90, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.624500, -1.268700), 4326), 2, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD008', 'PRODUCT', 'Teclado Mecánico', 'Teclado mecánico retroiluminado con switches azules', 79.90, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.624200, -1.268100), 4326), 2, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD009', 'PRODUCT', 'Cámara Fotográfica', 'Cámara digital 24MP con lente intercambiable', 550.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.620800, -1.267200), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD010', 'PRODUCT', 'Reloj Inteligente', 'Smartwatch con monitor cardíaco y GPS', 199.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.623100, -1.266800), 4326), 3, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD011', 'PRODUCT', 'Cafetera Automática', 'Cafetera espresso con molinillo integrado', 249.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.619200, -1.265800), 4326), 3, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD012', 'PRODUCT', 'Silla Ergonómica', 'Silla de oficina ajustable con soporte lumbar', 180.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.618500, -1.264900), 4326), 2, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD013', 'PRODUCT', 'Monitor 27"', 'Monitor QHD 144Hz para diseño y gaming', 320.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.621000, -1.265000), 4326), 2, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD014', 'PRODUCT', 'Tablet 10"', 'Tablet Android 128GB con lápiz óptico', 299.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.622200, -1.267800), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD015', 'PRODUCT', 'Impresora Multifunción', 'Impresora con WiFi, escáner y fotocopiadora', 160.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.624300, -1.266100), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD016', 'PRODUCT', 'Disco Duro Externo 1TB', 'Disco duro USB 3.0 portátil', 85.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.625100, -1.268900), 4326), 2, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD017', 'PRODUCT', 'Router WiFi 6', 'Router de alta velocidad con cobertura amplia', 120.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.623700, -1.268000), 4326), 8, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD018', 'PRODUCT', 'Parlante Bluetooth', 'Altavoz inalámbrico resistente al agua', 70.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.620100, -1.266400), 4326), 3, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD019', 'PRODUCT', 'Drone Profesional', 'Drone con cámara 4K y GPS integrado', 890.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.626500, -1.269500), 4326), 4, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('PRD020', 'PRODUCT', 'Consola de Videojuegos', 'Consola con 1TB de almacenamiento y mando inalámbrico', 499.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.625200, -1.267400), 4326), 4, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
-    ('SRV003', 'SERVICE', 'Instalación de Redes', 'Servicio profesional de instalación de redes domésticas y empresariales', 60.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.621100, -1.265900), 4326), 8, (SELECT id FROM users WHERE username = 'JoelB'), 'Lunes a Sábado: 08:00-17:00'),
-    ('SRV004', 'SERVICE', 'Fotografía Profesional', 'Cobertura de eventos y sesiones fotográficas', 150.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.624000, -1.267100), 4326), 5, (SELECT id FROM users WHERE username = 'JoelB'), 'Lunes a Domingo: 09:00-20:00'),
-    ('SRV005', 'SERVICE', 'Mantenimiento de Aires Acondicionados', 'Servicio técnico de instalación y mantenimiento', 45.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.622800, -1.266700), 4326), 6, (SELECT id FROM users WHERE username = 'JoelB'), 'Lunes a Viernes: 08:00-18:00');
+    ('PRD001', 'PRODUCT', 'Smartphone 10', 'Último modelo de smartphone con 128GB', 699.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(102.00303584077051, 33.10074754335619), 4326), 1, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
+    ('PRD002', 'PRODUCT', 'Sofá 3 Plazas', 'Sofá moderno de tela gris', 499.99, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.62415372809278, -1.2680301243556702), 4326), 2, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
+    ('SRV001', 'SERVICE', 'Clases de Yoga', 'Instructor certificado ofrece clases de yoga a domicilio', 20.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.62415372809278, -1.2680301243556702), 4326), 4, (SELECT id FROM users WHERE username = 'DavidM'), 'Lunes a Viernes de: 08:00-12:00'),
+    ('PRD003', 'PRODUCT', 'Bicicleta Montaña', 'Bicicleta MTB 29 pulgadas', 350.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.62415372809278, -1.2680301243556702), 4326), 4, (SELECT id FROM users WHERE username = 'JoelB'), NULL),
+    ('SRV002', 'SERVICE', 'Reparación de PC', 'Servicio técnico de computadoras y laptops', 30.00, 'AVAILABLE', 'VISIBLE', ST_SetSRID(ST_MakePoint(-78.62415372809278, -1.2680301243556702), 4326), 8, (SELECT id FROM users WHERE username = 'DavidM'), 'Lunes a Viernes de: 09:00-17:00');
 
 -- ======================
 -- Inserción de imágenes de ejemplo para publicaciones
@@ -436,3 +421,127 @@ CREATE TABLE appeals (
                          FOREIGN KEY (seller_id) REFERENCES users(id),
                          FOREIGN KEY (new_moderator_id) REFERENCES users(id)
 );
+
+-- =========================================================
+-- Datos de prueba para Incidencias, Reportes y Apelaciones
+-- =========================================================
+
+-- ======================
+-- Incidencia 1: Publicación bloqueada por sistema (3 reportes automáticos)
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision, auto_closed, moderator_comment)
+VALUES
+    (1, 'RESOLVED', (SELECT id FROM users WHERE username = 'JosueG'), 'REJECTED', TRUE, 'Producto con contenido inapropiado - bloqueado automáticamente por 3 reportes')
+ON CONFLICT DO NOTHING;
+
+-- Asegurar que el usuario system_user exista antes de insertar reportes del sistema
+INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at, location)
+SELECT
+    '9999999999',
+    'system_user',
+    crypt('system123', gen_salt('bf',12)),
+    'system@marketplace.local',
+    '+0000000000',
+    'System',
+    'Bot',
+    'OTHER',
+    'ACTIVE',
+    NOW(),
+    ST_SetSRID(ST_MakePoint(-78.62935, -1.24222), 4326)
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'system_user');
+
+-- Reportes del sistema para incidencia 1
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (1, (SELECT id FROM users WHERE username = 'system_user'), 'Contenido inapropiado', 'Detección automática de palabras prohibidas', 'SYSTEM'),
+    (1, (SELECT id FROM users WHERE username = 'system_user'), 'Información engañosa', 'Precio sospechoso detectado por algoritmo', 'SYSTEM'),
+    (1, (SELECT id FROM users WHERE username = 'system_user'), 'Imagen inapropiada', 'Imagen no cumple con políticas', 'SYSTEM')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 2: Reportada por usuarios, bajo revisión
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision)
+VALUES
+    (2, 'UNDER_REVIEW', (SELECT id FROM users WHERE username = 'JosueG'), 'PENDING')
+ON CONFLICT DO NOTHING;
+
+-- Reportes de usuarios para incidencia 2
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (2, (SELECT id FROM users WHERE username = 'DavidB'), 'Producto defectuoso', 'El producto no funciona como se describe', 'USER'),
+    (2, (SELECT id FROM users WHERE username = 'DavidM'), 'Precio incorrecto', 'El precio en la tienda física es diferente', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 3: Abierta, pendiente de asignación de moderador
+-- ======================
+INSERT INTO incidences (publication_id, status)
+VALUES
+    (3, 'OPEN')
+ON CONFLICT DO NOTHING;
+
+-- Reporte inicial para incidencia 3
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (3, (SELECT id FROM users WHERE username = 'DavidB'), 'Vendedor no responde', 'Intenté contactar al vendedor sin respuesta', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 4: Con apelación pendiente
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision)
+VALUES
+    (4, 'APPEALED', (SELECT id FROM users WHERE username = 'moderator_two'), 'REJECTED')
+ON CONFLICT DO NOTHING;
+
+-- Reportes para incidencia 4
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (4, (SELECT id FROM users WHERE username = 'DavidB'), 'Producto falsificado', 'La bicicleta parece ser una copia', 'USER'),
+    (4, (SELECT id FROM users WHERE username = 'DavidM'), 'Descripción engañosa', 'Las especificaciones no coinciden', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- Apelación del vendedor para incidencia 4
+INSERT INTO appeals (incidence_id, seller_id, reason, status, new_moderator_id)
+VALUES
+    (4, 
+     (SELECT id FROM users WHERE username = 'JoelB'), 
+     'Mi producto es auténtico. Tengo facturas y certificados de garantía que demuestran su originalidad. Los compradores malinterpretaron la descripción.',
+     'ASSIGNED',
+     (SELECT id FROM users WHERE username = 'moderator_three'))
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 5: Resuelta y aprobada
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision, moderator_comment)
+VALUES
+    (5, 'RESOLVED', (SELECT id FROM users WHERE username = 'moderator_three'), 'APPROVED', 'Reporte sin fundamento. Producto cumple con políticas.')
+ON CONFLICT DO NOTHING;
+
+-- Reporte sin fundamento para incidencia 5
+INSERT INTO reports (incidence_id, reporter_id, reason, comment, source)
+VALUES
+    (5, (SELECT id FROM users WHERE username = 'DavidB'), 'No me gustó', 'El teclado no es de mi agrado', 'USER')
+ON CONFLICT DO NOTHING;
+
+-- ======================
+-- Incidencia 6: Con apelación rechazada (final)
+-- ======================
+INSERT INTO incidences (publication_id, status, moderator_id, decision, moderator_comment)
+VALUES
+    (1, 'RESOLVED', (SELECT id FROM users WHERE username = 'JosueG'), 'REJECTED', 'Después de revisar la apelación, se mantiene la decisión de bloqueo.')
+ON CONFLICT DO NOTHING;
+
+-- Apelación rechazada para incidencia 6
+INSERT INTO appeals (incidence_id, seller_id, reason, status, new_moderator_id, final_decision, final_decision_at)
+VALUES
+    (1,
+     (SELECT id FROM users WHERE username = 'JoelB'),
+     'Solicito revisión de mi caso. El bloqueo fue injusto ya que cumplí con todas las políticas.',
+     'REVIEWED',
+     (SELECT id FROM users WHERE username = 'moderator_three'),
+     'REJECTED',
+     NOW() - INTERVAL '2 days')
+ON CONFLICT DO NOTHING;
