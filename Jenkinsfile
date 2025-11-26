@@ -307,8 +307,32 @@ pipeline {
                             return
                         }
                         
-                        echo "📋 Encontradas ${collectionFiles.size()} colección(es) Postman"
+                        echo "📋 Encontradas ${collectionFiles.size()} colección(es) Postman - se ejecutarán todas:"
                         collectionFiles.each { file -> echo "   - ${file}" }
+                        
+                        echo "🔐 Nota: Las colecciones deben tener un endpoint de Login que guarde el token JWT en 'jwt_token'"
+                        echo "   El token se usará automáticamente en todas las peticiones que requieran autenticación"
+                        
+                        // Verificar que el directorio uploads existe y tiene imágenes
+                        def uploadsDir = "uploads"
+                        def uploadsExists = fileExists(uploadsDir)
+                        def hasImages = false
+                        if (uploadsExists) {
+                            def imageFiles = sh(
+                                script: "find ${uploadsDir} -type f \\( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.webp' -o -name '*.gif' \\) 2>/dev/null | head -5 || true",
+                                returnStdout: true
+                            ).trim()
+                            hasImages = imageFiles && !imageFiles.isEmpty()
+                            if (hasImages) {
+                                echo "📸 Directorio uploads/ encontrado con imágenes disponibles"
+                                echo "   Imágenes encontradas (primeras 5):"
+                                imageFiles.split('\n').each { img -> echo "     - ${img}" }
+                            } else {
+                                echo "⚠️ Directorio uploads/ existe pero no contiene imágenes"
+                            }
+                        } else {
+                            echo "⚠️ Directorio uploads/ no encontrado - las pruebas que requieran imágenes pueden fallar"
+                        }
                         
                         // Detectar si necesitamos usar la red Docker
                         // Esto es necesario cuando:
@@ -475,6 +499,8 @@ pipeline {
                             echo "🔍 Ejecutando colección: ${collectionFile}"
                             echo "   BASE_URL: ${testBaseUrl}"
                             echo "   USER_EMAIL: ${env.POSTMAN_USER_EMAIL}"
+                            echo "   USER_PASSWORD: ${env.POSTMAN_USER_PASSWORD.replaceAll('.', '*')}" // Ocultar password en logs
+                            echo "   🔐 El login se ejecutará automáticamente y el token JWT se usará en todas las peticiones"
                             
                             // Ejecutar newman dentro de un contenedor Docker
                             // Usar la misma red Docker que el backend si está configurado
@@ -486,9 +512,47 @@ pipeline {
                                 echo "   Ejecutando sin red Docker específica (modo remoto)"
                             }
                             
+                            // Montar el directorio uploads/ para que las pruebas puedan acceder a las imágenes
+                            // Esto permite que las colecciones Postman usen las imágenes en las peticiones de crear/actualizar
+                            def mountUploads = ''
+                            if (uploadsExists && fileExists("${env.PROJECT_DIR}/${uploadsDir}")) {
+                                // Obtener la ruta absoluta del workspace actual (donde estamos ejecutando)
+                                // Docker necesita rutas absolutas, especialmente en Windows
+                                def workspacePath = sh(
+                                    script: "pwd",
+                                    returnStdout: true
+                                ).trim()
+                                
+                                // Construir la ruta absoluta del directorio uploads
+                                // En el contenedor, el workspace se monta en /workspace
+                                // Así que uploads estará disponible en /workspace/uploads
+                                def uploadsAbsolutePath = "${workspacePath}/${env.PROJECT_DIR}/${uploadsDir}"
+                                
+                                // Verificar que la ruta existe antes de montarla
+                                def uploadsPathExists = sh(
+                                    script: "test -d \"${uploadsAbsolutePath}\" && echo 'exists' || echo 'notfound'",
+                                    returnStdout: true
+                                ).trim()
+                                
+                                if (uploadsPathExists == 'exists') {
+                                    // Montar uploads en /workspace/uploads dentro del contenedor (solo lectura)
+                                    // Las colecciones Postman pueden referenciar imágenes como "uploads/nombre-imagen.jpg"
+                                    mountUploads = "-v \"${uploadsAbsolutePath}:/workspace/uploads:ro\""
+                                    echo "   📸 Montando directorio uploads/ en /workspace/uploads"
+                                    echo "      Host: ${uploadsAbsolutePath}"
+                                    echo "      Container: /workspace/uploads (solo lectura)"
+                                    echo "      💡 En Postman, usa rutas como: uploads/nombre-imagen.jpg"
+                                } else {
+                                    echo "   ⚠️ No se montará uploads/ (ruta no encontrada: ${uploadsAbsolutePath})"
+                                }
+                            } else {
+                                echo "   ⚠️ No se montará uploads/ (directorio no encontrado en ${env.PROJECT_DIR})"
+                            }
+                            
                             sh """
                                 docker run --rm ${dockerNetwork} \
                                     -v "\$(pwd):/workspace" \
+                                    ${mountUploads} \
                                     -w /workspace \
                                     -e BASE_URL="${testBaseUrl}" \
                                     -e USER_EMAIL="${env.POSTMAN_USER_EMAIL}" \
