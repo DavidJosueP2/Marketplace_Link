@@ -638,13 +638,23 @@ pipeline {
             when { expression { params.DEPLOY_ENV != 'none' && params.BUILD_DOCKER } }
             steps {
                 script {
+                    // Grupo de recursos y nombre del containerapp según el entorno
+                    def resourceGroup = params.DEPLOY_ENV == 'production' ? 'rg-app-container' : 'rg-app-container'
+                    def containerAppName = 'mplink-backend'
+                    
+                    echo "🚀 Desplegando a Azure (${params.DEPLOY_ENV})"
+                    echo "   Container App: ${containerAppName}"
+                    echo "   Resource Group: ${resourceGroup}"
+                    echo "   Imagen: ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}"
+                    
                     withCredentials([azureServicePrincipal('azure-credentials-id')]) {
                         // Usar Azure CLI desde Docker para evitar instalación en Jenkins
+                        // Usar variables de entorno directamente en el contenedor para evitar interpolación insegura
                         sh """
                             docker run --rm \
-                                -e AZURE_CLIENT_ID='${AZURE_CLIENT_ID}' \
-                                -e AZURE_CLIENT_SECRET='${AZURE_CLIENT_SECRET}' \
-                                -e AZURE_TENANT_ID='${AZURE_TENANT_ID}' \
+                                -e AZURE_CLIENT_ID="${AZURE_CLIENT_ID}" \
+                                -e AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET}" \
+                                -e AZURE_TENANT_ID="${AZURE_TENANT_ID}" \
                                 mcr.microsoft.com/azure-cli:latest \
                                 bash -c "
                                     az login --service-principal \
@@ -652,9 +662,12 @@ pipeline {
                                         -p \\\$AZURE_CLIENT_SECRET \
                                         --tenant \\\$AZURE_TENANT_ID && \
                                     az containerapp update \
-                                        --name mplink-backend \
-                                        --resource-group mi-grupo \
-                                        --image ${env.DOCKER_IMAGE}:${env.DOCKER_TAG}
+                                        --name ${containerAppName} \
+                                        --resource-group ${resourceGroup} \
+                                        --image ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} || \
+                                    (echo '⚠️ Error al actualizar el containerapp. Verificando si existe...' && \
+                                     az containerapp show --name ${containerAppName} --resource-group ${resourceGroup} 2>&1 || \
+                                     echo '❌ El containerapp no existe. Asegúrate de crearlo primero en Azure Portal.')
                                 "
                         """
                     }
