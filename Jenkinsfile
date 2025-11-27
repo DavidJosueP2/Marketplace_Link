@@ -581,12 +581,8 @@ pipeline {
                                 echo "⚠️ Advertencia: No se generó el archivo de resultados ${outputFile}"
                             }
                         }
-                    }
-                }
-            }
-            post {
-                always {
-                    script {
+                        
+                        // Publicar resultados JUnit después de ejecutar todas las colecciones
                         // Buscar archivos XML de resultados (path relativo al workspace raíz)
                         def xmlFiles = sh(
                             script: "find ${env.PROJECT_DIR}/target -name '*.xml' -type f 2>/dev/null || true",
@@ -625,6 +621,7 @@ pipeline {
                         } else {
                             echo "⚠️ No se encontraron archivos XML de resultados en ${env.PROJECT_DIR}/target/"
                             sh "ls -la ${env.PROJECT_DIR}/target/ 2>/dev/null || echo 'Directorio no encontrado'"
+                        }
                         }
                     }
                 }
@@ -756,4 +753,4 @@ pipeline {
             echo "Build finalizado con estado: ${currentBuild.currentResult}"
         }
     }
-}}
+}
