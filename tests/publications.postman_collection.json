@@ -35,7 +35,9 @@
 									"    pm.expect(jsonData).to.have.property('token');",
 									"});"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
 							}
 						}
 					],
@@ -60,13 +62,11 @@
 							}
 						},
 						"url": {
-							"raw": "{{BASE_URL}}/api/auth/login",
+							"raw": "{{BASE_URL}}/login",
 							"host": [
 								"{{BASE_URL}}"
 							],
 							"path": [
-								"api",
-								"auth",
 								"login"
 							]
 						},
@@ -159,7 +159,7 @@
 						},
 						{
 							"key": "description",
-							"value": "A la venta con drogas  promocion de año nuevo",
+							"value": "A la venta con ppromocion de año nuevo",
 							"type": "text"
 						},
 						{
@@ -184,14 +184,13 @@
 						},
 						{
 							"key": "vendorId",
-							"value": "3",
+							"value": "5",
 							"type": "text"
 						},
 						{
 							"key": "images",
 							"type": "file",
-							"src": [],
-							"disabled": true
+							"src": "/C:/Users/Josue/Pictures/wallpapers/566206.jpg"
 						}
 					]
 				},
@@ -254,7 +253,7 @@
 						{
 							"key": "images",
 							"type": "file",
-							"src": []
+							"src": "/C:/Users/Josue/Pictures/wallpapers/566206.jpg"
 						},
 						{
 							"key": "workingHours",
@@ -269,14 +268,14 @@
 					]
 				},
 				"url": {
-					"raw": "{{BASE_URL}}/api/publications/6",
+					"raw": "{{BASE_URL}}/api/publications/5",
 					"host": [
 						"{{BASE_URL}}"
 					],
 					"path": [
 						"api",
 						"publications",
-						"6"
+						"5"
 					]
 				}
 			},
@@ -322,14 +321,13 @@
 						},
 						{
 							"key": "vendorId",
-							"value": "4",
+							"value": "5",
 							"type": "text"
 						},
 						{
 							"key": "images",
-							"value": "",
 							"type": "file",
-							"disabled": true
+							"src": "/C:/Users/Josue/Pictures/wallpapers/1308512.jpeg"
 						},
 						{
 							"key": "availability",
@@ -344,14 +342,14 @@
 					]
 				},
 				"url": {
-					"raw": "{{BASE_URL}}/api/publications/2",
+					"raw": "{{BASE_URL}}/api/publications/5",
 					"host": [
 						"{{BASE_URL}}"
 					],
 					"path": [
 						"api",
 						"publications",
-						"2"
+						"5"
 					]
 				}
 			},
