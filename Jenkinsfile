@@ -486,7 +486,7 @@ pipeline {
                                         -H 'Content-Type: application/json' \\
                                         -d '{"email":"test@example.com","password":"password123"}' \\
                                         -w '\\nHTTP_CODE:%{http_code}\\n' \\
-                                        http://mplink-backend:8080/api/auth/login 2>&1 | head -100 || true
+                                        http://mplink-backend:8080/login 2>&1 | head -100 || true
                                 """
                                 echo "🔍 Verificando logs del backend después del intento de login..."
                                 sh "docker logs --tail 50 mplink-backend 2>&1 | grep -E '(JWT-LOGIN|ERROR|WARN|attemptAuthentication)' || echo 'Sin logs relevantes'"
@@ -713,7 +713,7 @@ pipeline {
         stage('Exponer Backend Local (Docker)') {
             when { 
                 expression { 
-                    params.EXPOSE_BACKEND && params.BUILD_DOCKER 
+                    params.EXPOSE_BACKEND 
                 } 
             }
             steps {

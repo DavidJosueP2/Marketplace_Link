@@ -3,8 +3,8 @@ services:
     image: postgis/postgis:16-3.5
     container_name: mplink-marketplace-db
     restart: unless-stopped
-    ports:
-      - "${DB_PORT:-5436}:5432"
+    expose:
+      - "5432"
     environment:
       POSTGRES_DB: marketplace_db
       POSTGRES_USER: postgres
@@ -24,8 +24,8 @@ services:
     image: postgis/postgis:16-3.5
     container_name: mplink-marketplace-test-db
     restart: unless-stopped
-    ports:
-      - "${DB_PORT_TEST:-5437}:5432"
+    expose:
+      - "5432"
     environment:
       POSTGRES_DB: ${DB_NAME_TEST:-marketplace_test_db}
       POSTGRES_USER: ${DB_USER_TEST:-postgres}
@@ -73,7 +73,7 @@ services:
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
       AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-imagenes}
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "8080:8080"
     volumes:
       - mplink_uploads:/app/uploads
     networks:
