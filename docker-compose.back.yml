@@ -3,8 +3,8 @@ services:
     image: postgis/postgis:16-3.5
     container_name: mplink-marketplace-db
     restart: unless-stopped
-    expose:
-      - "5432"
+    ports:
+      - "5438:5432"
     environment:
       POSTGRES_DB: marketplace_db
       POSTGRES_USER: postgres
@@ -24,8 +24,8 @@ services:
     image: postgis/postgis:16-3.5
     container_name: mplink-marketplace-test-db
     restart: unless-stopped
-    expose:
-      - "5432"
+    ports:
+      - "5439:5432"
     environment:
       POSTGRES_DB: ${DB_NAME_TEST:-marketplace_test_db}
       POSTGRES_USER: ${DB_USER_TEST:-postgres}
