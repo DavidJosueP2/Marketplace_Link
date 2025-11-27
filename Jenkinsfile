@@ -538,9 +538,22 @@ pipeline {
                             echo "   ⚠️ uploads/ no existe dentro del proyecto; algunas pruebas podrían fallar"
                         }
 
-                        // Jenkins usa un volumen llamado jenkins-data para /var/jenkins_home.
-                        // Montamos ese volumen directamente para que el contenedor Newman vea los archivos del workspace.
-                        def jenkinsVolumeMount = "-v jenkins-data:/var/jenkins_home"
+                        // Determinar el volumen real que usa Jenkins para /var/jenkins_home.
+                        // Por defecto docker-compose crea uno con prefijo del proyecto (ej: jenkins-docker_jenkins-data).
+                        def jenkinsVolumeName = env.JENKINS_HOME_VOLUME ?: 'jenkins-docker_jenkins-data'
+                        echo "   📦 Usando volumen de Jenkins: ${jenkinsVolumeName}"
+
+                        // Verificar que el volumen exista antes de usarlo
+                        def volumeExists = sh(
+                            script: "docker volume inspect ${jenkinsVolumeName} >/dev/null 2>&1 && echo 'exists' || echo 'missing'",
+                            returnStdout: true
+                        ).trim()
+
+                        if (volumeExists != 'exists') {
+                            error("❌ No se encontró el volumen ${jenkinsVolumeName}. Ajusta JENKINS_HOME_VOLUME o crea el volumen.")
+                        }
+
+                        def jenkinsVolumeMount = "-v ${jenkinsVolumeName}:/var/jenkins_home"
 
                         sh """
                             docker run --rm ${dockerNetwork} \
