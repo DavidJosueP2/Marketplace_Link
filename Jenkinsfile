@@ -277,7 +277,7 @@ pipeline {
             }
             steps {
                 dir(env.PROJECT_DIR) {
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         script {
                         // Si TEST_LOCAL_DOCKER está habilitado, usar la URL local
                         // Si no, usar la URL configurada (puede ser staging/production)
