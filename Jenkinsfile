@@ -62,7 +62,6 @@ pipeline {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        try {
                         if (!fileExists('pom.xml')) {
                             error("❌ No se encontró pom.xml en ${env.PROJECT_DIR}/")
                         }
@@ -277,9 +276,9 @@ pipeline {
                 } 
             }
             steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                 dir(env.PROJECT_DIR) {
                     script {
-                        try {
                         // Si TEST_LOCAL_DOCKER está habilitado, usar la URL local
                         // Si no, usar la URL configurada (puede ser staging/production)
                         def testBaseUrl = params.TEST_LOCAL_DOCKER ? 'http://localhost:8080' : env.POSTMAN_BASE_URL
@@ -560,8 +559,8 @@ pipeline {
                             
                             sh """
                                 docker run --rm ${dockerNetwork} \
-                                ${jenkinsVolumeMount} \
-                                -w "${workspaceAbsolutePath}" \
+                                    ${jenkinsVolumeMount} \
+                                    -w "${workspaceAbsolutePath}" \
                                     -e BASE_URL="${testBaseUrl}" \
                                     -e USER_EMAIL="${env.POSTMAN_USER_EMAIL}" \
                                     -e USER_PASSWORD="${env.POSTMAN_USER_PASSWORD}" \
@@ -581,10 +580,6 @@ pipeline {
                             } else {
                                 echo "⚠️ Advertencia: No se generó el archivo de resultados ${outputFile}"
                             }
-                        }
-                        } catch (Exception e) {
-                            echo "⚠️ Tests Postman fallaron: ${e.getMessage()}"
-                            unstable("Tests Postman fallaron: ${e.getMessage()}")
                         }
                     }
                 }
