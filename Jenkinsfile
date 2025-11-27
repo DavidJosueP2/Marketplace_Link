@@ -512,48 +512,40 @@ pipeline {
                                 echo "   Ejecutando sin red Docker específica (modo remoto)"
                             }
                             
-                            // Montar el directorio uploads/ para que las pruebas puedan acceder a las imágenes
-                            // Esto permite que las colecciones Postman usen las imágenes en las peticiones de crear/actualizar
-                            def mountUploads = ''
-                            if (uploadsExists && fileExists("${env.PROJECT_DIR}/${uploadsDir}")) {
-                                // Obtener la ruta absoluta del workspace actual (donde estamos ejecutando)
-                                // Docker necesita rutas absolutas, especialmente en Windows
-                                def workspacePath = sh(
-                                    script: "pwd",
-                                    returnStdout: true
-                                ).trim()
-                                
-                                // Construir la ruta absoluta del directorio uploads
-                                // En el contenedor, el workspace se monta en /workspace
-                                // Así que uploads estará disponible en /workspace/uploads
-                                def uploadsAbsolutePath = "${workspacePath}/${env.PROJECT_DIR}/${uploadsDir}"
-                                
-                                // Verificar que la ruta existe antes de montarla
-                                def uploadsPathExists = sh(
-                                    script: "test -d \"${uploadsAbsolutePath}\" && echo 'exists' || echo 'notfound'",
-                                    returnStdout: true
-                                ).trim()
-                                
-                                if (uploadsPathExists == 'exists') {
-                                    // Montar uploads en /workspace/uploads dentro del contenedor (solo lectura)
-                                    // Las colecciones Postman pueden referenciar imágenes como "uploads/nombre-imagen.jpg"
-                                    mountUploads = "-v \"${uploadsAbsolutePath}:/workspace/uploads:ro\""
-                                    echo "   📸 Montando directorio uploads/ en /workspace/uploads"
-                                    echo "      Host: ${uploadsAbsolutePath}"
-                                    echo "      Container: /workspace/uploads (solo lectura)"
-                                    echo "      💡 En Postman, usa rutas como: uploads/nombre-imagen.jpg"
-                                } else {
-                                    echo "   ⚠️ No se montará uploads/ (ruta no encontrada: ${uploadsAbsolutePath})"
-                                }
+                        // Obtener la ruta absoluta del workspace actual (dentro de /var/jenkins_home)
+                        def workspaceAbsolutePath = sh(
+                            script: "pwd",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "   📁 Workspace absoluto: ${workspaceAbsolutePath}"
+                        echo "   📄 Archivo de colección: ${collectionFile}"
+
+                        // Verificar estado del directorio uploads (ya accesible dentro del volumen de Jenkins)
+                        if (uploadsExists) {
+                            def uploadsAbsolutePath = "${workspaceAbsolutePath}/${uploadsDir}"
+                            def uploadsPathExists = sh(
+                                script: "test -d \"${uploadsAbsolutePath}\" && echo 'exists' || echo 'notfound'",
+                                returnStdout: true
+                            ).trim()
+
+                            if (uploadsPathExists == 'exists') {
+                                echo "   📸 Directorio uploads disponible en: ${uploadsAbsolutePath}"
                             } else {
-                                echo "   ⚠️ No se montará uploads/ (directorio no encontrado en ${env.PROJECT_DIR})"
+                                echo "   ⚠️ uploads/ no encontrado en ${uploadsAbsolutePath}"
                             }
-                            
-                            sh """
-                                docker run --rm ${dockerNetwork} \
-                                    -v "\$(pwd):/workspace" \
-                                    ${mountUploads} \
-                                    -w /workspace \
+                        } else {
+                            echo "   ⚠️ uploads/ no existe dentro del proyecto; algunas pruebas podrían fallar"
+                        }
+
+                        // Jenkins usa un volumen llamado jenkins-data para /var/jenkins_home.
+                        // Montamos ese volumen directamente para que el contenedor Newman vea los archivos del workspace.
+                        def jenkinsVolumeMount = "-v jenkins-data:/var/jenkins_home"
+
+                        sh """
+                            docker run --rm ${dockerNetwork} \
+                                ${jenkinsVolumeMount} \
+                                -w "${workspaceAbsolutePath}" \
                                     -e BASE_URL="${testBaseUrl}" \
                                     -e USER_EMAIL="${env.POSTMAN_USER_EMAIL}" \
                                     -e USER_PASSWORD="${env.POSTMAN_USER_PASSWORD}" \
