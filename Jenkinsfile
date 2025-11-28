@@ -109,10 +109,12 @@ pipeline {
                                 docker tag ${env.DOCKER_IMAGE}:${env.DOCKER_TAG} mplink-backend:latest
                             """
                             
-                            // Levantar servicios
-                            sh """
-                                ${dockerComposeCmd} -f ${env.COMPOSE_FILE} up -d mplink-postgres mplink-postgres-test mplink-backend
-                            """
+                            // Levantar servicios con credenciales de correo desde Jenkins
+                            withCredentials([usernamePassword(credentialsId: 'mail-smtp-creds', usernameVariable: 'MAIL_USERNAME', passwordVariable: 'MAIL_PASSWORD')]) {
+                                sh """
+                                    ${dockerComposeCmd} -f ${env.COMPOSE_FILE} up -d mplink-postgres mplink-postgres-test mplink-backend
+                                """
+                            }
                             
                             echo "⏳ Esperando servicios (BD: 60s, Backend: 180s)..."
                             
@@ -219,26 +221,26 @@ pipeline {
                             def jenkinsVolume = env.JENKINS_HOME_VOLUME ?: 'jenkins-docker_jenkins-data'
                             
                             withEnv(["TEST_BASE_URL=${testBaseUrl}"]) {
-                                collectionFiles.each { collection ->
-                                    def baseName = collection.split('/').last().replaceAll(/\.json$/, '')
-                                    def outputFile = "target/newman-${baseName}.xml"
-                                    
-                                    sh """
-                                        docker run --rm \
-                                            ${useDockerNetwork ? "--network ${backendNetwork}" : ""} \
-                                            -v ${jenkinsVolume}:/var/jenkins_home \
-                                            -w "${workspaceAbs}" \
-                                            -e BASE_URL="\${TEST_BASE_URL}" \
-                                            -e USER_EMAIL="${env.POSTMAN_USER_EMAIL}" \
-                                            -e USER_PASSWORD="${env.POSTMAN_USER_PASSWORD}" \
-                                            postman/newman:latest \
-                                            run "${collection}" \
-                                            --env-var "BASE_URL=\${TEST_BASE_URL}" \
-                                            --env-var "USER_EMAIL=${env.POSTMAN_USER_EMAIL}" \
-                                            --env-var "USER_PASSWORD=${env.POSTMAN_USER_PASSWORD}" \
-                                            --reporters cli,junit \
-                                            --reporter-junit-export "${outputFile}"
-                                    """
+                                withCredentials([usernamePassword(credentialsId: 'postman-test-user', usernameVariable: 'PM_USER', passwordVariable: 'PM_PASS')]) {
+                                    collectionFiles.each { collection ->
+                                        def baseName = collection.split('/').last().replaceAll(/\.json$/, '')
+                                        def outputFile = "target/newman-${baseName}.xml"
+                                        
+                                        sh """
+                                            docker run --rm \
+                                                ${useDockerNetwork ? "--network ${backendNetwork}" : ""} \
+                                                -v ${jenkinsVolume}:/var/jenkins_home \
+                                                -w "${workspaceAbs}" \
+                                                -e BASE_URL="\${TEST_BASE_URL}" \
+                                                postman/newman:latest \
+                                                run "${collection}" \
+                                                --env-var "BASE_URL=\${TEST_BASE_URL}" \
+                                                --env-var "USER_EMAIL=\${PM_USER}" \
+                                                --env-var "USER_PASSWORD=\${PM_PASS}" \
+                                                --reporters cli,junit \
+                                                --reporter-junit-export "${outputFile}"
+                                        """
+                                    }
                                 }
                             }
                             
@@ -346,8 +348,13 @@ pipeline {
                                 ${dockerComposeCmd} -f ${env.COMPOSE_FILE} down -v 2>/dev/null || true
                                 docker stop mplink-backend mplink-marketplace-db mplink-marketplace-test-db 2>/dev/null || true
                                 docker rm mplink-backend mplink-marketplace-db mplink-marketplace-test-db 2>/dev/null || true
-                                ${dockerComposeCmd} -f ${env.COMPOSE_FILE} up -d mplink-postgres mplink-postgres-test mplink-backend
                             """
+
+                            withCredentials([usernamePassword(credentialsId: 'mail-smtp-creds', usernameVariable: 'MAIL_USERNAME', passwordVariable: 'MAIL_PASSWORD')]) {
+                                sh """
+                                    ${dockerComposeCmd} -f ${env.COMPOSE_FILE} up -d mplink-postgres mplink-postgres-test mplink-backend
+                                """
+                            }
 
                             echo ""
                             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
