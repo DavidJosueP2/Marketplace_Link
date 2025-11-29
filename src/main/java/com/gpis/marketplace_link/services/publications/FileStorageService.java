@@ -38,6 +38,7 @@ public class FileStorageService {
 
     /**
      * Almacena un archivo usando Azure Blob Storage (si está habilitado) o sistema de archivos local
+     * Mejoras del fix/upload-images para manejo local más robusto
      * 
      * @param file archivo a almacenar
      * @return URL completa si usa Azure, o nombre del archivo si usa almacenamiento local
@@ -61,7 +62,8 @@ public class FileStorageService {
     }
 
     /**
-     * Almacena archivo en el sistema de archivos local (método original)
+     * Almacena archivo en el sistema de archivos local
+     * Lógica mejorada de fix/upload-images
      */
     private String storeFileLocally(MultipartFile file) {
         String originalFileName = file.getOriginalFilename();
@@ -84,7 +86,7 @@ public class FileStorageService {
     }
 
     /**
-     * Obtiene la ruta del archivo (solo para almacenamiento local)
+     * Obtiene la ruta del archivo en el sistema local
      */
     public Path getFilePath(String fileName) {
         return this.fileStorageLocation.resolve(fileName);
