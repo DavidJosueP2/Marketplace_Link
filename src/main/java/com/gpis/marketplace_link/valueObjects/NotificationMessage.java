@@ -1,5 +1,6 @@
 package com.gpis.marketplace_link.valueObjects;
 
+import com.gpis.marketplace_link.enums.EmailType;
 import lombok.Getter;
 import lombok.Setter;
 

@@ -1,7 +1,7 @@
 package com.gpis.marketplace_link.security;
 
 import com.gpis.marketplace_link.entities.User;
-import com.gpis.marketplace_link.repository.UserRepository;
+import com.gpis.marketplace_link.repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

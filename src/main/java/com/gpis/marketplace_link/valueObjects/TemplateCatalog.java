@@ -1,11 +1,13 @@
 package com.gpis.marketplace_link.valueObjects;
 
+import com.gpis.marketplace_link.enums.EmailType;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Objects;
 
-@Component
+// Duplicate of mail.TemplateCatalog. Disabled to avoid bean conflict.
+//@Component
 public class TemplateCatalog {
 
     private final Map<EmailType, TemplateInfo> byType = Map.of(
