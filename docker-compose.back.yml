@@ -42,6 +42,21 @@ services:
     networks:
       - mplink_net
 
+  # Azurite - Emulador local de Azure Storage
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: mplink-azurite
+    restart: unless-stopped
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service
+      - "10002:10002"  # Table service
+    volumes:
+      - azurite_data:/data
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose"
+    networks:
+      - mplink_net
+
   mplink-backend:
     build:
       context: .
@@ -69,9 +84,9 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5174,http://localhost:80,http://localhost}
       MODERATOR_DEFAULT_PASSWORD: ${MODERATOR_DEFAULT_PASSWORD:-SecretPasswordM123}
       SUSPENDED_TIME_DAYS: ${SUSPENDED_TIME_DAYS:-30}
-      AZURE_STORAGE_ENABLED: ${AZURE_STORAGE_ENABLED:-false}
-      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
-      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-imagenes}
+      AZURE_STORAGE_ENABLED: ${AZURE_STORAGE_ENABLED:-true}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;}
+      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-marketplace-images}
     ports:
       - "8080:8080"
     volumes:
@@ -83,6 +98,8 @@ services:
         condition: service_healthy
       mplink-postgres-test:
         condition: service_healthy
+      azurite:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
@@ -93,6 +110,7 @@ services:
 volumes:
   mplink_pgdata:
   mplink_uploads:
+  azurite_data:
 
 networks:
   mplink_net:

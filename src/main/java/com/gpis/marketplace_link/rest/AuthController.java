@@ -5,7 +5,7 @@ import com.gpis.marketplace_link.mappers.UserMapper;
 import com.gpis.marketplace_link.entities.User;
 import com.gpis.marketplace_link.security.service.SecurityService;
 import com.gpis.marketplace_link.services.user.EmailVerificationService;
-import com.gpis.marketplace_link.services.user.UserService;
+import com.gpis.marketplace_link.services.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
