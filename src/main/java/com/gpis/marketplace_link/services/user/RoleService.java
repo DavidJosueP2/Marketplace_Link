@@ -9,7 +9,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
-@Service
+// Duplicate of services.RoleService. Disabled to avoid bean conflict.
+//@Service
 @RequiredArgsConstructor
 public class RoleService {
 
