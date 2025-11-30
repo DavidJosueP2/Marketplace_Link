@@ -18,6 +18,9 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
     // ====== FINDS y EXISTS actuales (solo activos por @SoftDelete) ======
+  boolean existsByUsername(String username);
+  boolean existsByPhone(String phone);
+  boolean existsByCedula(String cedula);
 
     /**
      * Busca el moderador con menor carga de trabajo actual, excluyendo a uno específico.
@@ -187,6 +190,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Query(value = "SELECT * FROM users WHERE id = :userId", nativeQuery = true)
     Optional<User> findByIdNative(@Param("userId") Long userId);
+  
 
 
 }
