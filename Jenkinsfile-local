@@ -1,0 +1,143 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+    }
+
+    environment {
+        // Nombre de la imagen local del backend
+        BACK_IMAGE   = 'marketplace-link-back:local'
+
+        // Archivos de configuración
+        COMPOSE_FILE = 'docker-compose.yml'
+        ENV_FILE     = '.env'
+
+        // Datos de la base de datos según docker-compose
+        DB_SERVICE_NAME = 'mplink_postgres'   // nombre del servicio en docker-compose
+        DB_NETWORK      = 'mplink_net'        // nombre de la red en docker-compose
+        DB_PORT         = '5432'              // puerto interno del contenedor de Postgres
+
+        // Nombre del contenedor del backend que levantaremos
+        BACK_CONTAINER_NAME = 'marketplace-link-back'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Esto usará la rama que configures en el job (ej: jenkins/local)
+                checkout scm
+            }
+        }
+
+        stage('Preparar .env') {
+            when {
+                expression { fileExists('.env.example') && !fileExists('.env') }
+            }
+            steps {
+                sh '''
+                  echo "[INFO] No existe .env, copiando desde .env.example..."
+                  cp .env.example .env
+                '''
+            }
+        }
+
+        stage('Tests (clean + test + Jacoco check)') {
+            steps {
+                sh '''
+                  echo "[INFO] Ejecutando pruebas con Maven (clean test)..."
+                  docker run --rm \
+                    -v "$PWD":/app \
+                    -w /app \
+                    maven:3.9-eclipse-temurin-21 \
+                    mvn -B clean test
+                '''
+            }
+        }
+
+        stage('Build imagen backend') {
+            steps {
+                sh '''
+                  echo "[INFO] Construyendo imagen Docker del backend..."
+                  docker build -t ${BACK_IMAGE} .
+                '''
+            }
+        }
+
+        stage('Levantar base de datos (docker compose)') {
+            steps {
+                sh '''
+                  echo "[INFO] Bajando stack previo de compose (si existe)..."
+                  docker compose --env-file ${ENV_FILE} -f ${COMPOSE_FILE} down || true
+
+                  echo "[INFO] Levantando solo servicios definidos en docker-compose..."
+                  docker compose --env-file ${ENV_FILE} -f ${COMPOSE_FILE} up -d
+
+                  echo "[INFO] Contenedores de docker compose:"
+                  docker compose -f ${COMPOSE_FILE} ps
+                '''
+            }
+        }
+
+        stage('Levantar backend (docker run)') {
+            steps {
+                sh '''
+                  echo "[INFO] Eliminando contenedor previo del backend (si existe)..."
+                  docker rm -f ${BACK_CONTAINER_NAME} || true
+
+                  echo "[INFO] Levantando backend en contenedor..."
+
+                  docker run -d \
+                    --name ${BACK_CONTAINER_NAME} \
+                    --network ${DB_NETWORK} \
+                    -p 8080:8080 \
+                    -e DB_HOST=${DB_SERVICE_NAME} \
+                    -e DB_PORT=${DB_PORT} \
+                    -e DB_NAME=${DB_NAME:-marketplace_db} \
+                    -e DB_USER=${DB_USER:-postgres} \
+                    -e DB_PASSWORD=${DB_PASSWORD:-admin} \
+                    -e JAVA_OPTS="-Dspring.profiles.active=dev" \
+                    ${BACK_IMAGE}
+
+                  echo "[INFO] Contenedores en la red ${DB_NETWORK}:"
+                  docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+                '''
+            }
+        }
+
+        stage('Smoke test (Actuator)') {
+            steps {
+                sh '''
+                  echo "[INFO] Esperando a que el backend arranque..."
+                  sleep 30
+
+                  echo "[INFO] Probando /actuator/health..."
+                  curl -f http://localhost:8080/actuator/health || {
+                    echo "[ERROR] El backend no respondió OK en /actuator/health"
+                    docker logs ${BACK_CONTAINER_NAME} || true
+                    docker compose -f ${COMPOSE_FILE} logs || true
+                    exit 1
+                  }
+
+                  echo "[INFO] Backend OK según Actuator."
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sh '''
+                  echo "[INFO] Estado final de los contenedores:"
+                  docker ps
+
+                  echo "[INFO] (Opcional) Dejar solo la base de datos y tumbar el backend..."
+                  # Si quieres que el backend quede corriendo, comenta la siguiente línea
+                  docker rm -f ${BACK_CONTAINER_NAME} || true
+                '''
+            }
+        }
+    }
+}
