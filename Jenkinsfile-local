@@ -66,19 +66,16 @@ pipeline {
         stage('Fix docker init scripts en workspace') {
           steps {
             sh '''
-              echo "[DEBUG] Antes de fix:"
-              pwd
-              ls -la docker/ || true
-
-              echo "[DEBUG] Borrando carpeta docker completa..."
+              echo "[DEBUG] Recuperando docker/ desde git para asegurar init.sql correcto..."
               rm -rf docker
-
-              echo "[DEBUG] Recuperando docker/ desde git..."
               git checkout -- docker
 
-              echo "[DEBUG] Después de fix:"
-              ls -la docker/
-              file docker/init.sql || echo "comando file no disponible"
+              echo "[DEBUG] Copiando init.sql al raíz para evitar problemas de montaje..."
+              cp docker/init.sql init.sql
+
+              echo "[DEBUG] Verificando archivos:"
+              ls -lh docker/init.sql
+              ls -lh init.sql
             '''
           }
         }
@@ -101,9 +98,9 @@ pipeline {
                   echo "[INFO] Eliminando volumen de PostgreSQL para forzar inicialización..."
                   docker volume rm marketplace-backend-pipeline_mplink_pgdata || true
 
-                  echo "[INFO] Verificando que init.sql existe y es un archivo..."
-                  ls -lh docker/init.sql
-                  file docker/init.sql || true
+                  echo "[INFO] Verificando que init.sql existe en el raíz como archivo..."
+                  ls -lh init.sql
+                  test -f init.sql && echo "✓ init.sql es un archivo" || echo "✗ ERROR: init.sql no es un archivo"
 
                   echo "[INFO] Levantando SOLO la DB principal y Azurite (sin DB de tests)..."
                   docker compose -f ${COMPOSE_FILE} up -d mplink_postgres azurite
