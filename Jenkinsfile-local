@@ -72,21 +72,24 @@ pipeline {
             }
         }
 
-        stage('DEBUG docker en workspace ANTES de docker compose') {
+        stage('Fix docker init scripts en workspace') {
           steps {
             sh '''
-              echo "[DEBUG] pwd:"
+              echo "[DEBUG] Antes:"
               pwd
-
-              echo "[DEBUG] Contenido de docker/:"
               ls -R docker || true
 
-              echo "[DEBUG] Tipo de docker/init.sql:"
-              ls -ld docker/init.sql || true
+              echo "[DEBUG] Borrando carpeta docker completa..."
+              rm -rf docker
+
+              echo "[DEBUG] Recuperando docker/ desde git..."
+              git checkout -- docker
+
+              echo "[DEBUG] Después:"
+              ls -R docker || true
             '''
           }
         }
-
 
         stage('Levantar base de datos (docker compose)') {
             steps {
@@ -101,25 +104,6 @@ pipeline {
                   docker compose -f ${COMPOSE_FILE} ps
                 '''
             }
-        }
-
-        stage('Fix init.sql en workspace') {
-          steps {
-            sh '''
-              echo "[DEBUG] Antes:"
-              ls -ld docker || true
-              ls -ld docker/init.sql || true
-
-              echo "[DEBUG] Borrando docker/init.sql (sea archivo o carpeta)..."
-              rm -rf docker/init.sql
-
-              echo "[DEBUG] Recuperando init.sql desde git..."
-              git checkout -- docker/init.sql
-
-              echo "[DEBUG] Después:"
-              ls -ld docker/init.sql || true
-            '''
-          }
         }
 
         stage('Levantar backend (docker run)') {
