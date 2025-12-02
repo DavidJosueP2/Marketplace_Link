@@ -76,7 +76,7 @@ pipeline {
                   docker network create ${DOCKER_NETWORK} || echo "[INFO] La red ya existe"
 
                   echo "[INFO] Levantando backend con docker run..."
-                  echo "[NOTA] El backend se conectará a: mplink-marketplace-db:5432"
+                  echo "[NOTA] El backend se conectará a: mplink_marketplace_db:5432"
                   echo "[NOTA] Asegúrate de tener la BD corriendo en la red ${DOCKER_NETWORK}"
 
                   docker run -d \
@@ -84,7 +84,7 @@ pipeline {
                     --network ${DOCKER_NETWORK} \
                     -p 8084:8080 \
                     -e SPRING_PROFILES_ACTIVE=dev \
-                    -e DB_HOST=mplink-marketplace-db \
+                    -e DB_HOST=mplink_marketplace_db \
                     -e DB_PORT=5432 \
                     -e DB_NAME=marketplace_db \
                     -e DB_USER=postgres \
