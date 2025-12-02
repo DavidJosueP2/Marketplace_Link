@@ -126,15 +126,25 @@ pipeline {
                   echo "[INFO] Esperando 10 segundos adicionales para asegurar que el backend esté listo..."
                   sleep 10
 
-                  echo "[INFO] Probando /actuator/health en http://localhost:8084..."
-                  curl -f http://localhost:8084/actuator/health || {
-                    echo "[ERROR] El backend no respondió OK en /actuator/health"
+                  echo "[INFO] Probando /actuator/health desde Jenkins container..."
+                  echo "[NOTA] Jenkins está dentro de Docker, debe usar el nombre del contenedor, NO localhost"
+
+                  # Opción 1: Probar con el nombre del contenedor (red Docker interna)
+                  echo "[TEST 1] Probando con nombre de contenedor: http://${BACK_CONTAINER_NAME}:${CONTAINER_PORT}/actuator/health"
+                  docker exec ${BACK_CONTAINER_NAME} curl -f http://localhost:${CONTAINER_PORT}/actuator/health || {
+                    echo "[ERROR] El backend no respondió OK desde dentro del contenedor"
                     echo "[INFO] Logs completos del backend:"
                     docker logs ${BACK_CONTAINER_NAME}
                     exit 1
                   }
 
-                  echo "[INFO] ✓ Backend OK según Actuator."
+                  echo "[INFO] ✓ Backend OK según Actuator (desde dentro del contenedor)."
+                  echo ""
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                  echo "✅ Backend disponible en tu navegador (host):"
+                  echo "   http://localhost:${HOST_PORT}/actuator/health"
+                  echo "   http://localhost:${HOST_PORT}/swagger-ui.html"
+                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 '''
             }
         }
