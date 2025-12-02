@@ -72,6 +72,22 @@ pipeline {
             }
         }
 
+        stage('DEBUG docker en workspace ANTES de docker compose') {
+          steps {
+            sh '''
+              echo "[DEBUG] pwd:"
+              pwd
+
+              echo "[DEBUG] Contenido de docker/:"
+              ls -R docker || true
+
+              echo "[DEBUG] Tipo de docker/init.sql:"
+              ls -ld docker/init.sql || true
+            '''
+          }
+        }
+
+
         stage('Levantar base de datos (docker compose)') {
             steps {
                 sh '''
