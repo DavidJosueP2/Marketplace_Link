@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   mplink_postgres:
     image: postgis/postgis:16-3.5
@@ -10,9 +12,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
     volumes:
+      # Datos persistentes de la BD principal
       - mplink_pgdata:/var/lib/postgresql/data
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/20_init.sql
+      # Scripts de inicialización (.sql / .sh) -> se ejecutan SOLO la primera vez
+      - ./docker:/docker-entrypoint-initdb.d
     healthcheck:
+      # Ojo: DB_USER y DB_NAME deben venir de .env o del entorno de Jenkins
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
@@ -30,11 +35,12 @@ services:
       POSTGRES_DB: ${DB_NAME_TEST}
       POSTGRES_USER: ${DB_USER_TEST}
       POSTGRES_PASSWORD: ${DB_PASSWORD_TEST}
-    # Sin volumen persistente
+    # BD de tests en memoria (no persiste)
     tmpfs:
       - /var/lib/postgresql/data:rw
     volumes:
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Usa los mismos scripts de inicialización (read-only opcional)
+      - ./docker:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER_TEST} -d ${DB_NAME_TEST}"]
       interval: 10s
@@ -55,7 +61,12 @@ services:
     volumes:
       - azurite_data:/data
       - ./azure-storage-setup.sh:/scripts/setup.sh
-    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose"
+    command: >
+      azurite
+      --blobHost 0.0.0.0
+      --queueHost 0.0.0.0
+      --tableHost 0.0.0.0
+      --loose
     networks:
       - mplink_net
     healthcheck:
