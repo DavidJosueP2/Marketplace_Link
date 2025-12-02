@@ -7,19 +7,21 @@ pipeline {
     }
 
     environment {
+        // Nombre de la imagen local del backend
         BACK_IMAGE   = 'marketplace-link-back:local'
 
-        // Compose de la app (el del raíz)
+        // Archivos de configuración
         COMPOSE_FILE = 'docker-compose.yml'
+        ENV_FILE     = '.env'
 
-        // Forzamos nombre de proyecto de docker compose
-        COMPOSE_PROJECT_NAME = 'mplink'
+        // OJO: este es el *nombre real* de la red que se ve en tu log:
+        // Network marketplace-backend-pipeline_mplink_net  Created
+        DB_NETWORK      = 'marketplace-backend-pipeline_mplink_net'
 
-        // Datos DB
+        // Nombre del servicio en docker-compose (no el container_name)
         DB_SERVICE_NAME = 'mplink_postgres'
-        DB_NETWORK      = 'mplink_mplink_net'  // <proyecto>_<network>
-        DB_PORT         = '5432'
 
+        DB_PORT             = '5432'
         BACK_CONTAINER_NAME = 'marketplace-link-back'
     }
 
