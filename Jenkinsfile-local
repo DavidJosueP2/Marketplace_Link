@@ -63,6 +63,26 @@ pipeline {
             }
         }
 
+        stage('Fix docker init scripts en workspace') {
+          steps {
+            sh '''
+              echo "[DEBUG] Antes de fix:"
+              pwd
+              ls -la docker/ || true
+
+              echo "[DEBUG] Borrando carpeta docker completa..."
+              rm -rf docker
+
+              echo "[DEBUG] Recuperando docker/ desde git..."
+              git checkout -- docker
+
+              echo "[DEBUG] Después de fix:"
+              ls -la docker/
+              file docker/init.sql || echo "comando file no disponible"
+            '''
+          }
+        }
+
         stage('Build imagen backend') {
             steps {
                 sh '''
@@ -72,33 +92,27 @@ pipeline {
             }
         }
 
-        stage('Fix docker init scripts en workspace') {
-          steps {
-            sh '''
-              echo "[DEBUG] Antes:"
-              pwd
-              ls -R docker || true
-
-              echo "[DEBUG] Borrando carpeta docker completa..."
-              rm -rf docker
-
-              echo "[DEBUG] Recuperando docker/ desde git..."
-              git checkout -- docker
-
-              echo "[DEBUG] Después:"
-              ls -R docker || true
-            '''
-          }
-        }
-
         stage('Levantar base de datos (docker compose)') {
             steps {
                 sh '''
                   echo "[INFO] Bajando stack previo de compose (si existe)..."
                   docker compose -f ${COMPOSE_FILE} down -v || true
 
+                  echo "[INFO] Eliminando volumen de PostgreSQL para forzar inicialización..."
+                  docker volume rm marketplace-backend-pipeline_mplink_pgdata || true
+
+                  echo "[INFO] Verificando que init.sql existe y es un archivo..."
+                  ls -lh docker/init.sql
+                  file docker/init.sql || true
+
                   echo "[INFO] Levantando SOLO la DB principal y Azurite (sin DB de tests)..."
                   docker compose -f ${COMPOSE_FILE} up -d mplink_postgres azurite
+
+                  echo "[INFO] Esperando a que PostgreSQL inicialice completamente..."
+                  sleep 15
+
+                  echo "[INFO] Verificando logs de inicialización de PostgreSQL..."
+                  docker logs mplink_marketplace_db 2>&1 | tail -30
 
                   echo "[INFO] Contenedores de docker compose:"
                   docker compose -f ${COMPOSE_FILE} ps
