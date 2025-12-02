@@ -87,6 +87,21 @@ pipeline {
             }
         }
 
+        stage('Debug init.sql') {
+          steps {
+            sh '''
+              echo "[DEBUG] Contenido de docker/ en workspace Jenkins:"
+              ls -l docker
+
+              echo "[DEBUG] docker-compose.yml que se está usando:"
+              cat docker-compose.yml | sed -n '1,120p'
+
+              echo "[DEBUG] Después de levantar la DB, listar /docker-entrypoint-initdb.d:"
+              docker compose -f docker-compose.yml exec -T mplink_marketplace_db ls -l /docker-entrypoint-initdb.d || true
+            '''
+          }
+        }
+
         stage('Levantar backend (docker run)') {
             steps {
                 sh '''
