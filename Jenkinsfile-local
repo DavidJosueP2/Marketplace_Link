@@ -87,17 +87,21 @@ pipeline {
             }
         }
 
-        stage('Debug init.sql') {
+        stage('Fix init.sql en workspace') {
           steps {
             sh '''
-              echo "[DEBUG] Contenido de docker/ en workspace Jenkins:"
-              ls -l docker
+              echo "[DEBUG] Antes:"
+              ls -ld docker || true
+              ls -ld docker/init.sql || true
 
-              echo "[DEBUG] docker-compose.yml que se está usando:"
-              cat docker-compose.yml | sed -n '1,120p'
+              echo "[DEBUG] Borrando docker/init.sql (sea archivo o carpeta)..."
+              rm -rf docker/init.sql
 
-              echo "[DEBUG] Después de levantar la DB, listar /docker-entrypoint-initdb.d:"
-              docker compose -f docker-compose.yml exec -T mplink_marketplace_db ls -l /docker-entrypoint-initdb.d || true
+              echo "[DEBUG] Recuperando init.sql desde git..."
+              git checkout -- docker/init.sql
+
+              echo "[DEBUG] Después:"
+              ls -ld docker/init.sql || true
             '''
           }
         }
