@@ -14,12 +14,14 @@ pipeline {
         COMPOSE_FILE = 'docker-compose.yml'
         ENV_FILE     = '.env'
 
-        // Datos de la base de datos según docker-compose
-        DB_SERVICE_NAME = 'mplink_postgres'   // nombre del servicio en docker-compose
-        DB_NETWORK      = 'mplink_net'        // nombre de la red en docker-compose
-        DB_PORT         = '5432'              // puerto interno del contenedor de Postgres
+        // OJO: este es el *nombre real* de la red que se ve en tu log:
+        // Network marketplace-backend-pipeline_mplink_net  Created
+        DB_NETWORK      = 'marketplace-backend-pipeline_mplink_net'
 
-        // Nombre del contenedor del backend que levantaremos
+        // Nombre del servicio en docker-compose (no el container_name)
+        DB_SERVICE_NAME = 'mplink_postgres'
+
+        DB_PORT             = '5432'
         BACK_CONTAINER_NAME = 'marketplace-link-back'
     }
 
@@ -76,8 +78,8 @@ pipeline {
                   echo "[INFO] Bajando stack previo de compose (si existe)..."
                   docker compose -f ${COMPOSE_FILE} down || true
 
-                  echo "[INFO] Levantando solo servicios definidos en docker-compose..."
-                  docker compose -f ${COMPOSE_FILE} up -d
+                  echo "[INFO] Levantando SOLO la DB principal y Azurite (sin DB de tests)..."
+                  docker compose -f ${COMPOSE_FILE} up -d mplink_postgres azurite
 
                   echo "[INFO] Contenedores de docker compose:"
                   docker compose -f ${COMPOSE_FILE} ps

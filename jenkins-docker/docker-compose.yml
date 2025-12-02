@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins
+    user: "root"
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      # Volumen de Jenkins (ya existe en tu docker: 'jenkins_home')
+      - jenkins_home:/var/jenkins_home
+      # Socket de Docker del host (para que Jenkins hable con el daemon)
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JENKINS_OPTS=
+      - JAVA_OPTS=-Djava.awt.headless=true
+
+volumes:
+  jenkins_home:
+
