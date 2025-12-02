@@ -7,11 +7,12 @@ pipeline {
     }
 
     environment {
-        // Archivo de configuración de Docker Compose para el backend
-        COMPOSE_FILE = 'docker-compose.back.yml'
+        // Nombre de la imagen y contenedor del backend
+        BACK_IMAGE = 'marketplace-link-back:local'
+        BACK_CONTAINER_NAME = 'marketplace-link-back'
 
-        // Nombre del contenedor del backend
-        BACK_CONTAINER_NAME = 'mplink-backend'
+        // Red de Docker (se crea automáticamente con el nombre del job como prefijo)
+        DOCKER_NETWORK = 'marketplace-backend-pipeline_mplink_net'
     }
 
     stages {
@@ -52,32 +53,50 @@ pipeline {
             }
         }
 
-        // TODO: Problema con init.sql montándose como directorio en Jenkins
-        // Por ahora levantamos solo el backend, la BD debe estar corriendo externamente
-        // Investigar: bind mounts en Docker dentro de contenedor Jenkins
-
-        stage('Levantar backend con Docker Compose') {
+        stage('Build imagen backend') {
             steps {
                 sh '''
-                  echo "[INFO] Bajando contenedores previos del backend (si existen)..."
-                  docker compose -f ${COMPOSE_FILE} down || true
+                  echo "[INFO] Construyendo imagen Docker del backend..."
+                  docker build -t ${BACK_IMAGE} .
+                '''
+            }
+        }
 
-                  echo "[INFO] Construyendo y levantando SOLO el backend con docker-compose..."
-                  echo "[NOTA] El backend se conectará a: mplink-postgres:5432"
-                  echo "[NOTA] Asegúrate de tener la BD y Azurite corriendo en la misma red de Docker"
+        // TODO: Problema con init.sql montándose como directorio en Jenkins
+        // Por ahora solo levantamos el backend, la BD debe estar corriendo externamente
+        // Investigar: bind mounts en Docker dentro de contenedor Jenkins
 
-                  # Levantar solo el servicio del backend SIN sus dependencias (--no-deps)
-                  # Esto evita que intente levantar postgres, postgres-test y azurite
-                  docker compose -f ${COMPOSE_FILE} up -d --build --no-deps mplink-backend
+        stage('Levantar backend con docker run') {
+            steps {
+                sh '''
+                  echo "[INFO] Eliminando contenedor previo del backend (si existe)..."
+                  docker rm -f ${BACK_CONTAINER_NAME} || true
 
-                  echo "[INFO] Esperando 15 segundos para que el backend inicie..."
-                  sleep 15
+                  echo "[INFO] Creando red de Docker si no existe..."
+                  docker network create ${DOCKER_NETWORK} || echo "[INFO] La red ya existe"
 
-                  echo "[INFO] Estado de los contenedores:"
-                  docker compose -f ${COMPOSE_FILE} ps
+                  echo "[INFO] Levantando backend con docker run..."
+                  echo "[NOTA] El backend se conectará a: mplink-marketplace-db:5432"
+                  echo "[NOTA] Asegúrate de tener la BD corriendo en la red ${DOCKER_NETWORK}"
+
+                  docker run -d \
+                    --name ${BACK_CONTAINER_NAME} \
+                    --network ${DOCKER_NETWORK} \
+                    -p 8084:8080 \
+                    -e SPRING_PROFILES_ACTIVE=dev \
+                    -e DB_HOST=mplink-marketplace-db \
+                    -e DB_PORT=5432 \
+                    -e DB_NAME=marketplace_db \
+                    -e DB_USER=postgres \
+                    -e DB_PASSWORD=admin \
+                    -e SERVER_PORT=8080 \
+                    ${BACK_IMAGE}
+
+                  echo "[INFO] Esperando 20 segundos para que el backend inicie..."
+                  sleep 20
 
                   echo "[INFO] Logs del backend:"
-                  docker compose -f ${COMPOSE_FILE} logs mplink-backend | tail -30
+                  docker logs ${BACK_CONTAINER_NAME} 2>&1 | tail -40
                 '''
             }
         }
@@ -85,14 +104,14 @@ pipeline {
         stage('Smoke test (Actuator)') {
             steps {
                 sh '''
-                  echo "[INFO] Esperando 15 segundos adicionales para asegurar que el backend esté listo..."
-                  sleep 15
+                  echo "[INFO] Esperando 10 segundos adicionales para asegurar que el backend esté listo..."
+                  sleep 10
 
                   echo "[INFO] Probando /actuator/health en http://localhost:8084..."
                   curl -f http://localhost:8084/actuator/health || {
                     echo "[ERROR] El backend no respondió OK en /actuator/health"
                     echo "[INFO] Logs completos del backend:"
-                    docker compose -f ${COMPOSE_FILE} logs mplink-backend
+                    docker logs ${BACK_CONTAINER_NAME}
                     exit 1
                   }
 
@@ -107,12 +126,11 @@ pipeline {
             script {
                 sh '''
                   echo "[INFO] Estado final de los contenedores:"
-                  docker compose -f ${COMPOSE_FILE} ps
                   docker ps
 
                   echo "[INFO] Pipeline completado."
                   # Si quieres tumbar el backend automáticamente, descomenta la siguiente línea:
-                  # docker compose -f ${COMPOSE_FILE} down
+                  # docker rm -f ${BACK_CONTAINER_NAME}
                 '''
             }
         }
