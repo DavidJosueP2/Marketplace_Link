@@ -8,10 +8,18 @@ pipeline {
 
     environment {
         BACK_IMAGE   = 'marketplace-link-back:local'
+
+        // Compose de la app (el del raíz)
         COMPOSE_FILE = 'docker-compose.yml'
+
+        // Forzamos nombre de proyecto de docker compose
+        COMPOSE_PROJECT_NAME = 'mplink'
+
+        // Datos DB
         DB_SERVICE_NAME = 'mplink_postgres'
-        DB_NETWORK      = 'mplink_net'
+        DB_NETWORK      = 'mplink_mplink_net'  // <proyecto>_<network>
         DB_PORT         = '5432'
+
         BACK_CONTAINER_NAME = 'marketplace-link-back'
     }
 
