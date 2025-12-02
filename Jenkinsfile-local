@@ -64,10 +64,11 @@ pipeline {
 
                   echo "[INFO] Construyendo y levantando SOLO el backend con docker-compose..."
                   echo "[NOTA] El backend se conectará a: mplink-postgres:5432"
-                  echo "[NOTA] Asegúrate de tener la BD corriendo en la misma red de Docker"
+                  echo "[NOTA] Asegúrate de tener la BD y Azurite corriendo en la misma red de Docker"
 
-                  # Levantar solo el servicio del backend (construye la imagen automáticamente)
-                  docker compose -f ${COMPOSE_FILE} up -d --build mplink-backend
+                  # Levantar solo el servicio del backend SIN sus dependencias (--no-deps)
+                  # Esto evita que intente levantar postgres, postgres-test y azurite
+                  docker compose -f ${COMPOSE_FILE} up -d --build --no-deps mplink-backend
 
                   echo "[INFO] Esperando 15 segundos para que el backend inicie..."
                   sleep 15
