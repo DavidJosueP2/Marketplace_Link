@@ -3,7 +3,7 @@ pipeline {
 
     options {
         timestamps()
-        ansiColor('xterm')
+        ansiColor('xterm') // si en algún momento da error, quita esta línea o instala el plugin AnsiColor
     }
 
     environment {
@@ -28,6 +28,14 @@ pipeline {
             steps {
                 // Esto usará la rama que configures en el job (ej: jenkins/local)
                 checkout scm
+
+                // opcional, pero útil para debug
+                sh '''
+                  echo "[DEBUG] Workspace actual:"
+                  pwd
+                  echo "[DEBUG] Archivos en el workspace:"
+                  ls -la
+                '''
             }
         }
 
@@ -46,12 +54,9 @@ pipeline {
         stage('Tests (clean + test + Jacoco check)') {
             steps {
                 sh '''
-                  echo "[INFO] Ejecutando pruebas con Maven (clean test)..."
-                  docker run --rm \
-                    -v "$PWD":/app \
-                    -w /app \
-                    maven:3.9-eclipse-temurin-21 \
-                    mvn -B clean test
+                  echo "[INFO] Ejecutando pruebas con Maven Wrapper (clean test)..."
+                  chmod +x mvnw || true
+                  ./mvnw -B clean test
                 '''
             }
         }
