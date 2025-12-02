@@ -11,8 +11,8 @@ pipeline {
         BACK_IMAGE = 'marketplace-link-back:local'
         BACK_CONTAINER_NAME = 'marketplace-link-back'
 
-        // Red de Docker (se crea automáticamente con el nombre del job como prefijo)
-        DOCKER_NETWORK = 'marketplace-backend-pipeline_mplink_net'
+        // Red de Docker donde están las BDs (la que se crea con docker-compose.yml)
+        DOCKER_NETWORK = 'marketplace_link_mplink_net'
     }
 
     stages {
@@ -90,6 +90,14 @@ pipeline {
                     -e DB_USER=postgres \
                     -e DB_PASSWORD=admin \
                     -e SERVER_PORT=8080 \
+                    -e MAIL_HOST=smtp.gmail.com \
+                    -e MAIL_PORT=587 \
+                    -e MAIL_USERNAME= \
+                    -e MAIL_PASSWORD= \
+                    -e FRONTEND_URL=http://localhost:5173 \
+                    -e MODERATOR_DEFAULT_PASSWORD=SecretPasswordM123 \
+                    -e SUSPENDED_TIME_DAYS=30 \
+                    -e AZURE_STORAGE_ENABLED=false \
                     ${BACK_IMAGE}
 
                   echo "[INFO] Esperando 20 segundos para que el backend inicie..."
