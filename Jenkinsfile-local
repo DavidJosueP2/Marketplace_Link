@@ -104,9 +104,11 @@ pipeline {
                     -e DB_USER=${DB_USER} \
                     -e DB_PASSWORD=${DB_PASSWORD} \
                     -e SERVER_PORT=${CONTAINER_PORT} \
+                    -e FRONTEND_URL=http://localhost:5173 \
                     -e AZURE_STORAGE_ENABLED=false \
                     -e AZURE_STORAGE_CONNECTION_STRING=unused \
                     -e AZURE_STORAGE_CONTAINER_NAME=marketplace-images \
+                    --label "com.docker.compose.project=marketplace_link" \
                     ${BACK_IMAGE}
 
                   echo "[INFO] Esperando 20 segundos para que el backend inicie..."
