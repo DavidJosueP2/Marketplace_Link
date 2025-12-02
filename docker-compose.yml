@@ -1,4 +1,10 @@
 services:
+  # TODO: Problema conocido - init.sql se monta como directorio en Jenkins
+  # Cuando se ejecuta desde Jenkins, ./docker/init.sql se crea como directorio vacío
+  # en lugar de montar el archivo, causando error "Is a directory" en PostgreSQL.
+  # Posibles soluciones: imagen custom de postgres con COPY, o volumen named.
+  # Por ahora, la BD se levanta manualmente fuera del pipeline.
+
   mplink_postgres:
     image: postgis/postgis:16-3.5
     container_name: mplink_marketplace_db
