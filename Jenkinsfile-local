@@ -83,24 +83,12 @@ pipeline {
                     --name ${BACK_CONTAINER_NAME} \
                     --network ${DOCKER_NETWORK} \
                     -p 8084:8080 \
-                    -e "JAVA_OPTS=-Dspring.profiles.active=dev" \
-                    -e "SPRING_PROFILES_ACTIVE=dev" \
-                    -e "DB_HOST=mplink_marketplace_db" \
-                    -e "DB_PORT=5432" \
-                    -e "DB_NAME=marketplace_db" \
-                    -e "DB_USER=postgres" \
-                    -e "DB_PASSWORD=admin" \
-                    -e "SERVER_PORT=8080" \
-                    -e "MAIL_HOST=smtp.gmail.com" \
-                    -e "MAIL_PORT=587" \
-                    -e "MAIL_USERNAME=" \
-                    -e "MAIL_PASSWORD=" \
-                    -e "FRONTEND_URL=http://localhost:5173" \
-                    -e "MODERATOR_DEFAULT_PASSWORD=SecretPasswordM123" \
-                    -e "SUSPENDED_TIME_DAYS=30" \
-                    -e "AZURE_STORAGE_ENABLED=false" \
-                    -e "AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://mplink_azurite:10000/devstoreaccount1;" \
-                    -e "AZURE_STORAGE_CONTAINER_NAME=marketplace-images" \
+                    -e SPRING_PROFILES_ACTIVE=dev \
+                    -e DB_HOST=mplink_marketplace_db \
+                    -e DB_PORT=5432 \
+                    -e DB_NAME=marketplace_db \
+                    -e DB_USER=postgres \
+                    -e DB_PASSWORD=admin \
                     ${BACK_IMAGE}
 
                   echo "[INFO] Esperando 20 segundos para que el backend inicie..."
