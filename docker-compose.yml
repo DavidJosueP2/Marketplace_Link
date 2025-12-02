@@ -12,12 +12,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
     volumes:
-      # Datos persistentes de la BD principal
       - mplink_pgdata:/var/lib/postgresql/data
-      # Scripts de inicialización (.sql / .sh) -> se ejecutan SOLO la primera vez
-      - ./docker:/docker-entrypoint-initdb.d
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      # Ojo: DB_USER y DB_NAME deben venir de .env o del entorno de Jenkins
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
@@ -39,8 +36,7 @@ services:
     tmpfs:
       - /var/lib/postgresql/data:rw
     volumes:
-      # Usa los mismos scripts de inicialización (read-only opcional)
-      - ./docker:/docker-entrypoint-initdb.d:ro
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER_TEST} -d ${DB_NAME_TEST}"]
       interval: 10s
