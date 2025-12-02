@@ -98,7 +98,7 @@ pipeline {
                   docker run -d \
                     --name ${BACK_CONTAINER_NAME} \
                     --network ${DB_NETWORK} \
-                    -p 8080:8080 \
+                    -p 8084:8080 \
                     -e DB_HOST=${DB_SERVICE_NAME} \
                     -e DB_PORT=${DB_PORT} \
                     -e DB_NAME=${DB_NAME:-marketplace_db} \
@@ -120,7 +120,7 @@ pipeline {
                   sleep 30
 
                   echo "[INFO] Probando /actuator/health..."
-                  curl -f http://localhost:8080/actuator/health || {
+                  curl -f http://localhost:8084/actuator/health || {
                     echo "[ERROR] El backend no respondió OK en /actuator/health"
                     docker logs ${BACK_CONTAINER_NAME} || true
                     docker compose -f ${COMPOSE_FILE} logs || true
