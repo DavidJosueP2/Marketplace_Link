@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
     volumes:
-      - mp_pgdata:/var/lib/postgresql/data
+      - mplink_pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/20_init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
