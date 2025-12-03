@@ -3,164 +3,198 @@ pipeline {
 
     options {
         timestamps()
-        ansiColor('xterm') // si en algún momento da error, quita esta línea o instala el plugin AnsiColor
+        ansiColor('xterm')
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+        skipDefaultCheckout(true)
+    }
+
+    parameters {
+        booleanParam(
+            name: 'RUN_TESTS',
+            defaultValue: false,
+            description: 'Ejecutar tests de Maven antes del build de la imagen'
+        )
+
+        string(name: 'SPRING_PROFILE', defaultValue: 'prod', description: 'spring.profiles.active')
+        string(name: 'HOST_PORT', defaultValue: '8080', description: 'Puerto expuesto en el host')
+        string(name: 'CONTAINER_PORT', defaultValue: '8080', description: 'SERVER_PORT dentro del contenedor')
+
+        string(name: 'DB_HOST', defaultValue: 'localhost', description: 'Host de la base de datos')
+        string(name: 'DB_PORT', defaultValue: '5432', description: 'Puerto de la base de datos')
+        string(name: 'DB_NAME', defaultValue: 'marketplace', description: 'Nombre de la base de datos')
+        string(name: 'DB_USER', defaultValue: 'marketplace', description: 'Usuario de la base de datos')
+        string(name: 'DB_PASSWORD', defaultValue: '', description: 'Password de la base de datos')
+
+        string(name: 'DOCKER_NETWORK', defaultValue: 'marketplace_link_mplink_net', description: 'Red Docker para conectar el backend')
+        string(name: 'FRONTEND_URL', defaultValue: 'http://localhost:5174', description: 'URL del frontend para CORS/redirecciones')
+
+        string(name: 'AZURE_STORAGE_ENABLED', defaultValue: 'false', description: 'Habilitar integración con Azure Storage')
+        string(name: 'AZURE_STORAGE_CONNECTION_STRING', defaultValue: 'unused', description: 'Connection string de Azure Storage')
+        string(name: 'AZURE_STORAGE_CONTAINER_NAME', defaultValue: 'marketplace-images', description: 'Nombre del contenedor en Azure Storage')
     }
 
     environment {
-        // Nombre de la imagen y contenedor del backend
-        BACK_IMAGE = 'marketplace-link-back:local'
-        BACK_CONTAINER_NAME = 'marketplace-link-back'
+        SPRING_PROFILE = "${params.SPRING_PROFILE}"
 
-        // Red de Docker donde están las BDs (la que se crea con docker-compose.yml)
-        DOCKER_NETWORK = 'marketplace_link_mplink_net'
+        HOST_PORT      = "${params.HOST_PORT}"
+        CONTAINER_PORT = "${params.CONTAINER_PORT}"
 
-        // Configuración de puertos
-        HOST_PORT = '8084'
-        CONTAINER_PORT = '8080'
+        DB_HOST        = "${params.DB_HOST}"
+        DB_PORT        = "${params.DB_PORT}"
+        DB_NAME        = "${params.DB_NAME}"
+        DB_USER        = "${params.DB_USER}"
+        DB_PASSWORD    = "${params.DB_PASSWORD}"
 
-        // Perfil de Spring
-        SPRING_PROFILE = 'dev'
+        DOCKER_NETWORK = "${params.DOCKER_NETWORK}"
+        FRONTEND_URL   = "${params.FRONTEND_URL}"
 
-        // Configuración de Base de Datos
-        DB_HOST = 'mplink_marketplace_db'
-        DB_PORT = '5432'
-        DB_NAME = 'marketplace_db'
-        DB_USER = 'postgres'
-        DB_PASSWORD = 'admin'
+        AZURE_STORAGE_ENABLED           = "${params.AZURE_STORAGE_ENABLED}"
+        AZURE_STORAGE_CONNECTION_STRING = "${params.AZURE_STORAGE_CONNECTION_STRING}"
+        AZURE_STORAGE_CONTAINER_NAME    = "${params.AZURE_STORAGE_CONTAINER_NAME}"
+
+        BACK_IMAGE          = 'marketplace-backend-local'
+        BACK_TAG            = "${env.BUILD_NUMBER}"
+        BACK_CONTAINER_NAME = 'marketplace_backend'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Esto usará la rama que configures en el job (ej: jenkins/local)
                 checkout scm
 
-                // opcional, pero útil para debug
-                sh '''
-                  echo "[DEBUG] Workspace actual:"
-                  pwd
-                  echo "[DEBUG] Archivos en el workspace:"
-                  ls -la
-                '''
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Commit:              ${env.GIT_COMMIT_SHORT}"
+                    echo "SPRING_PROFILE:      ${env.SPRING_PROFILE}"
+                    echo "HOST_PORT:           ${env.HOST_PORT}"
+                    echo "CONTAINER_PORT:      ${env.CONTAINER_PORT}"
+                    echo "DB_HOST:             ${env.DB_HOST}"
+                    echo "DB_PORT:             ${env.DB_PORT}"
+                    echo "DB_NAME:             ${env.DB_NAME}"
+                    echo "DB_USER:             ${env.DB_USER}"
+                    echo "DOCKER_NETWORK:      ${env.DOCKER_NETWORK}"
+                    echo "FRONTEND_URL:        ${env.FRONTEND_URL}"
+                    echo "AZURE_STORAGE_ENABLED:           ${env.AZURE_STORAGE_ENABLED}"
+                    echo "AZURE_STORAGE_CONTAINER_NAME:    ${env.AZURE_STORAGE_CONTAINER_NAME}"
+                    echo "BACK_IMAGE:          ${env.BACK_IMAGE}:${env.BACK_TAG}"
+                    echo "BACK_CONTAINER_NAME: ${env.BACK_CONTAINER_NAME}"
+                }
             }
         }
 
-        stage('Preparar .env') {
+        stage('Tests (opcional)') {
             when {
-                expression { fileExists('.env.example') && !fileExists('.env') }
+                expression { params.RUN_TESTS }
             }
             steps {
-                sh '''
-                  echo "[INFO] No existe .env, copiando desde .env.example..."
-                  cp .env.example .env
-                '''
-            }
-        }
-
-        stage('Tests (clean + test + Jacoco check)') {
-            steps {
-                sh '''
-                  echo "[INFO] Ejecutando fase de tests en CI (saltando tests porque son demostrativos)..."
-                  chmod +x mvnw || true
-                  ./mvnw -B clean package -Dmaven.test.skip=true
-                '''
+                script {
+                    sh '''
+                        docker run --rm \
+                          -v "$PWD":/app \
+                          -w /app \
+                          maven:3.9-eclipse-temurin-21 \
+                          mvn test
+                    '''
+                }
             }
         }
 
-        stage('Build imagen backend') {
+        stage('Detener contenedor anterior') {
             steps {
-                sh '''
-                  echo "[INFO] Construyendo imagen Docker del backend..."
-                  docker build -t ${BACK_IMAGE} .
-                '''
+                script {
+                    sh """
+                        docker stop ${env.BACK_CONTAINER_NAME} 2>/dev/null || echo "Sin contenedor en ejecución"
+                        docker rm   ${env.BACK_CONTAINER_NAME} 2>/dev/null || echo "Sin contenedor que remover"
+                    """
+                }
             }
         }
 
-        // TODO: Problema con init.sql montándose como directorio en Jenkins
-        // Por ahora solo levantamos el backend, la BD debe estar corriendo externamente
-        // Investigar: bind mounts en Docker dentro de contenedor Jenkins
-
-        stage('Levantar backend con docker run') {
+        stage('Build imagen Docker') {
             steps {
-                sh '''
-                  echo "[INFO] Eliminando contenedor previo del backend (si existe)..."
-                  docker rm -f ${BACK_CONTAINER_NAME} || true
-
-                  echo "[INFO] Creando red de Docker si no existe..."
-                  docker network create ${DOCKER_NETWORK} || echo "[INFO] La red ya existe"
-
-                  echo "[INFO] Levantando backend con docker run..."
-                  echo "[NOTA] El backend se conectará a: mplink_marketplace_db:5432"
-                  echo "[NOTA] Asegúrate de tener la BD corriendo en la red ${DOCKER_NETWORK}"
-
-                  docker run -d \
-                    --name ${BACK_CONTAINER_NAME} \
-                    --network ${DOCKER_NETWORK} \
-                    -p ${HOST_PORT}:${CONTAINER_PORT} \
-                    -e JAVA_OPTS="-Dspring.profiles.active=${SPRING_PROFILE}" \
-                    -e DB_HOST=${DB_HOST} \
-                    -e DB_PORT=${DB_PORT} \
-                    -e DB_NAME=${DB_NAME} \
-                    -e DB_USER=${DB_USER} \
-                    -e DB_PASSWORD=${DB_PASSWORD} \
-                    -e SERVER_PORT=${CONTAINER_PORT} \
-                    -e FRONTEND_URL=http://localhost:5174 \
-                    -e AZURE_STORAGE_ENABLED=false \
-                    -e AZURE_STORAGE_CONNECTION_STRING=unused \
-                    -e AZURE_STORAGE_CONTAINER_NAME=marketplace-images \
-                    --label "com.docker.compose.project=marketplace_link" \
-                    ${BACK_IMAGE}
-
-                  echo "[INFO] Esperando 20 segundos para que el backend inicie..."
-                  sleep 20
-
-                  echo "[INFO] Logs del backend:"
-                  docker logs ${BACK_CONTAINER_NAME} 2>&1 | tail -40
-                '''
+                script {
+                    sh """
+                        docker build \
+                          -t ${env.BACK_IMAGE}:${env.BACK_TAG} \
+                          -t ${env.BACK_IMAGE}:latest \
+                          .
+                    """
+                }
             }
         }
 
-        stage('Smoke test (Actuator)') {
+        stage('Desplegar contenedor') {
             steps {
-                sh '''
-                  echo "[INFO] Esperando 10 segundos adicionales para asegurar que el backend esté listo..."
-                  sleep 10
+                script {
+                    sh """
+                        docker run -d \
+                          --name ${BACK_CONTAINER_NAME} \
+                          --network ${DOCKER_NETWORK} \
+                          -p ${HOST_PORT}:${CONTAINER_PORT} \
+                          -e JAVA_OPTS="-Dspring.profiles.active=${SPRING_PROFILE}" \
+                          -e DB_HOST=${DB_HOST} \
+                          -e DB_PORT=${DB_PORT} \
+                          -e DB_NAME=${DB_NAME} \
+                          -e DB_USER=${DB_USER} \
+                          -e DB_PASSWORD=${DB_PASSWORD} \
+                          -e SERVER_PORT=${CONTAINER_PORT} \
+                          -e FRONTEND_URL=${FRONTEND_URL} \
+                          -e AZURE_STORAGE_ENABLED=${AZURE_STORAGE_ENABLED} \
+                          -e AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING} \
+                          -e AZURE_STORAGE_CONTAINER_NAME=${AZURE_STORAGE_CONTAINER_NAME} \
+                          --label "com.docker.compose.project=marketplace_link" \
+                          --restart unless-stopped \
+                          ${BACK_IMAGE}:${BACK_TAG}
+                    """
+                }
+            }
+        }
 
-                  echo "[INFO] Probando /actuator/health desde Jenkins container..."
-                  echo "[NOTA] Jenkins está dentro de Docker, debe usar el nombre del contenedor, NO localhost"
+        stage('Verificación') {
+            steps {
+                script {
+                    sleep 5
 
-                  # Opción 1: Probar con el nombre del contenedor (red Docker interna)
-                  echo "[TEST 1] Probando con nombre de contenedor: http://${BACK_CONTAINER_NAME}:${CONTAINER_PORT}/actuator/health"
-                  docker exec ${BACK_CONTAINER_NAME} curl -f http://localhost:${CONTAINER_PORT}/actuator/health || {
-                    echo "[ERROR] El backend no respondió OK desde dentro del contenedor"
-                    echo "[INFO] Logs completos del backend:"
-                    docker logs ${BACK_CONTAINER_NAME}
-                    exit 1
-                  }
+                    def status = sh(
+                        script: "docker ps --filter name=${env.BACK_CONTAINER_NAME} --format '{{.Status}}'",
+                        returnStdout: true
+                    ).trim()
 
-                  echo "[INFO] ✓ Backend OK según Actuator (desde dentro del contenedor)."
-                  echo ""
-                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                  echo "✅ Backend disponible en tu navegador (host):"
-                  echo "   http://localhost:${HOST_PORT}/actuator/health"
-                  echo "   http://localhost:${HOST_PORT}/swagger-ui.html"
-                  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                '''
+                    if (!status.contains('Up')) {
+                        error "El contenedor no está corriendo. Status: ${status}"
+                    }
+
+                    echo "Contenedor en ejecución: ${status}"
+
+                    sh "docker logs --tail=80 ${env.BACK_CONTAINER_NAME} || true"
+                }
             }
         }
     }
 
     post {
-        always {
+        success {
             script {
-                sh '''
-                  echo "[INFO] Estado final de los contenedores:"
-                  docker ps
-
-                  echo "[INFO] Pipeline completado."
-                  # Si quieres tumbar el backend automáticamente, descomenta la siguiente línea:
-                  # docker rm -f ${BACK_CONTAINER_NAME}
-                '''
+                echo "Backend desplegado correctamente."
+                echo "URL:        http://localhost:${env.HOST_PORT}"
+                echo "Imagen:     ${env.BACK_IMAGE}:${env.BACK_TAG}"
+                echo "Contenedor: ${env.BACK_CONTAINER_NAME}"
+            }
+        }
+        failure {
+            script {
+                echo "Despliegue backend fallido. Revisar logs."
+                sh "docker logs ${env.BACK_CONTAINER_NAME} 2>/dev/null || echo 'Sin logs del contenedor'"
+            }
+        }
+        cleanup {
+            script {
+                sh "docker image prune -f 2>/dev/null || true"
             }
         }
     }
