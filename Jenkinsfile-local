@@ -132,6 +132,12 @@ pipeline {
             steps {
                 script {
                     sh """
+                        docker stop marketplace_backend 2>/dev/null || true
+                        docker rm marketplace_backend 2>/dev/null || true
+
+                        docker stop marketplace-link-back 2>/dev/null || true
+                        docker rm marketplace-link-back 2>/dev/null || true
+
                         docker run -d \
                           --name ${BACK_CONTAINER_NAME} \
                           --network ${DOCKER_NETWORK} \
