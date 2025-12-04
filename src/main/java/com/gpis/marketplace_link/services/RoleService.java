@@ -1,4 +1,4 @@
-package com.gpis.marketplace_link.services.user;
+package com.gpis.marketplace_link.services;
 
 import com.gpis.marketplace_link.entities.Role;
 import com.gpis.marketplace_link.repositories.RoleRepository;
@@ -9,8 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
-// Duplicate of services.RoleService. Disabled to avoid bean conflict.
-//@Service
+@Service
 @RequiredArgsConstructor
 public class RoleService {
 

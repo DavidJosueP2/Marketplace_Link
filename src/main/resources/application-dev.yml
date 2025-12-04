@@ -61,4 +61,11 @@ management:
     mail:
       enabled: false  # Deshabilitar health check de mail en dev para evitar errores
 
+# Azure Blob Storage - Usando Azurite (emulador local)
+azure:
+  storage:
+    enabled: ${AZURE_STORAGE_ENABLED:true}
+    connection-string: ${AZURE_STORAGE_CONNECTION_STRING:DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1;}
+    container-name: ${AZURE_STORAGE_CONTAINER_NAME:marketplace-images}
+
 

@@ -193,29 +193,34 @@ public class PublicationService {
         }
         publication.setType(publication.getWorkingHours() != null ? PublicationType.SERVICE : PublicationType.PRODUCT);
 
-        // ✅ FIX: Obtener lista de URLs existentes que se deben mantener
-        Set<String> existingUrlsToKeep = request.existingImageUrls() != null 
-            ? new HashSet<>(request.existingImageUrls()) 
-            : new HashSet<>();
+        // 1. Obtener URLs de imágenes que se deben MANTENER (vienen del frontend)
+        List<String> imagesToKeep = request.existingImageUrls() != null ? request.existingImageUrls()
+                : new ArrayList<>();
 
-        // ✅ FIX: Identificar imágenes a eliminar (las que NO están en existingUrlsToKeep)
+        // 2. Identificar imágenes que están en la BD pero NO en la lista de mantener ->
+        // ELIMINAR
         List<PublicationImage> imagesToRemove = publication.getImages().stream()
-                .filter(img -> !existingUrlsToKeep.contains(img.getPath()))
+                .filter(img -> !imagesToKeep.contains(img.getPath())) // Si no está en la lista de keep, se borra
                 .toList();
 
-        // Eliminar imágenes que ya no se necesitan
+        // 3. Eliminar imágenes (BD y Storage)
         for (PublicationImage img : imagesToRemove) {
             publication.getImages().remove(img);
             fileStorageService.deleteFile(img.getPath());
         }
 
-        // Agregar solo las imágenes NUEVAS (los archivos MultipartFile)
-        for (MultipartFile file : request.images()) {
-            String path = fileStorageService.storeFile(file);
-            PublicationImage img = new PublicationImage();
-            img.setPath(path);
-            img.setPublication(publication);
-            publication.getImages().add(img);
+        // 4. Procesar NUEVAS imágenes (archivos subidos)
+        if (request.images() != null) {
+            for (MultipartFile file : request.images()) {
+                if (file.isEmpty())
+                    continue;
+
+                String path = fileStorageService.storeFile(file);
+                PublicationImage img = new PublicationImage();
+                img.setPath(path);
+                img.setPublication(publication);
+                publication.getImages().add(img);
+            }
         }
 
         validateDangerousContent(publication);
