@@ -41,8 +41,33 @@ services:
       retries: 5
     networks:
       - mplink_net
+
+  # Azurite - Emulador local de Azure Storage (Blob, Queue, Table)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: mplink_azurite
+    restart: unless-stopped
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service
+      - "10002:10002"  # Table service
+    volumes:
+      - azurite_data:/data
+      - ./azure-storage-setup.sh:/scripts/setup.sh
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose"
+    networks:
+      - mplink_net
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:10000/devstoreaccount1?comp=list', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
   mplink_pgdata:
+  azurite_data:
+
 networks:
   mplink_net:
     driver: bridge

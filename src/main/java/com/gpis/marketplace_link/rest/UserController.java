@@ -7,7 +7,7 @@ import com.gpis.marketplace_link.dto.user.UserResponse;
 import com.gpis.marketplace_link.dto.user.UserUpdateRequest;
 import com.gpis.marketplace_link.mappers.UserMapper;
 import com.gpis.marketplace_link.entities.User;
-import com.gpis.marketplace_link.services.user.UserService;
+import com.gpis.marketplace_link.services.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

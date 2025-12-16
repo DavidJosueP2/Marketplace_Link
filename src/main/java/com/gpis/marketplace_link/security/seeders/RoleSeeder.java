@@ -2,8 +2,8 @@ package com.gpis.marketplace_link.security.seeders;
 
 import com.gpis.marketplace_link.entities.Role;
 import com.gpis.marketplace_link.entities.User;
-import com.gpis.marketplace_link.repository.RoleRepository;
-import com.gpis.marketplace_link.repository.UserRepository;
+import com.gpis.marketplace_link.repositories.RoleRepository;
+import com.gpis.marketplace_link.repositories.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;

@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS publications (
     type VARCHAR(20) NOT NULL, -- PRODUCT or SERVICE
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    price DECIMAL(10,2) NOT NULL,
+    price DECIMAL(15,2) NOT NULL,
     availability VARCHAR(20) NOT NULL  DEFAULT 'AVAILABLE', -- AVAILABLE, UNAVAILABLE
     status VARCHAR(20) NOT NULL DEFAULT 'VISIBLE', -- VISIBLE,  UNDER_REVIEW , BLOCKED,
     previous_status VARCHAR(20),
@@ -307,12 +307,22 @@ VALUES
     ON CONFLICT (username) DO NOTHING;
 
 -- ======================
--- Asignación del rol ROLE_MODERATOR a los nuevos moderadores
+-- Usuario de prueba para tests automatizados (Postman/Newman)
+-- ======================
+INSERT INTO users (cedula, username, password, email, phone, first_name, last_name, gender, account_status, email_verified_at, location)
+VALUES
+    ('0808080808', 'test_user', crypt('password123', gen_salt('bf',12)), 'test@example.com', '0999000008', 'Test', 'User', 'MALE', 'ACTIVE', NOW(),
+     ST_SetSRID(ST_MakePoint(-78.628837, -1.241657), 4326))
+    ON CONFLICT (username) DO NOTHING;
+
+-- ======================
+-- Asignación del rol ROLE_MODERATOR a los nuevos moderadores y ROLE_SELLER al usuario de prueba
 -- ======================
 INSERT INTO users_roles (user_id, role_id)
 VALUES
     ((SELECT id FROM users WHERE username = 'moderator_two'), (SELECT id FROM roles WHERE name = 'ROLE_MODERATOR')),
-    ((SELECT id FROM users WHERE username = 'moderator_three'), (SELECT id FROM roles WHERE name = 'ROLE_MODERATOR'))
+    ((SELECT id FROM users WHERE username = 'moderator_three'), (SELECT id FROM roles WHERE name = 'ROLE_MODERATOR')),
+    ((SELECT id FROM users WHERE username = 'test_user'), (SELECT id FROM roles WHERE name = 'ROLE_SELLER'))
     ON CONFLICT (user_id, role_id) DO NOTHING;
 
 
