@@ -11,7 +11,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
     volumes:
       - mplink_pgdata:/var/lib/postgresql/data
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # ':z' relabela el archivo para SELinux (necesario en Fedora/RHEL).
+      # En distros sin SELinux es inofensivo.
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-marketplace_db}"]
       interval: 10s
