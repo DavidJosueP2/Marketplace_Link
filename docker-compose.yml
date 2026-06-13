@@ -6,68 +6,61 @@ services:
     ports:
       - "${DB_PORT:-5436}:5432"
     environment:
-      POSTGRES_DB: marketplace_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: ${DB_NAME:-marketplace_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
     volumes:
       - mplink_pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-marketplace_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - mplink_net
-  mplink_postgres_test:
-    image: postgis/postgis:16-3.5
-    container_name: mplink_marketplace_test_db
-    restart: unless-stopped
-    ports:
-      - "${DB_PORT_TEST:-5437}:5432"
-    environment:
-      POSTGRES_DB: ${DB_NAME_TEST}
-      POSTGRES_USER: ${DB_USER_TEST}
-      POSTGRES_PASSWORD: ${DB_PASSWORD_TEST}
-    # Sin volumen persistente
-    tmpfs:
-      - /var/lib/postgresql/data:rw
-    volumes:
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER_TEST} -d ${DB_NAME_TEST}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - mplink_net
+      - back_mplink_net
 
-  # Azurite - Emulador local de Azure Storage (Blob, Queue, Table)
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:latest
-    container_name: mplink_azurite
+  mplink_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mplink-backend:latest
+    container_name: mplink_backend
     restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_HOST: mplink_postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-marketplace_db}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-admin}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      JWT_SECRET: ${JWT_SECRET}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5174,http://localhost}
+      MODERATOR_DEFAULT_PASSWORD: ${MODERATOR_DEFAULT_PASSWORD:-SecretPasswordM123}
+      SUSPENDED_TIME_DAYS: ${SUSPENDED_TIME_DAYS:-30}
     ports:
-      - "10000:10000"  # Blob service
-      - "10001:10001"  # Queue service
-      - "10002:10002"  # Table service
-    volumes:
-      - azurite_data:/data
-      - ./azure-storage-setup.sh:/scripts/setup.sh
-    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose"
+      - "${SERVER_PORT:-8080}:8080"
     networks:
-      - mplink_net
+      - back_mplink_net
+    depends_on:
+      mplink_postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:10000/devstoreaccount1?comp=list', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   mplink_pgdata:
-  azurite_data:
 
 networks:
-  mplink_net:
+  back_mplink_net:
+    name: back_mplink_net
     driver: bridge

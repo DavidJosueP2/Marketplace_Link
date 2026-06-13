@@ -27,10 +27,10 @@ spring:
     hibernate:
       ddl-auto: validate
     database-platform: org.hibernate.spatial.dialect.postgis.PostgisPG95Dialect
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   web:
     resources:
@@ -64,9 +64,9 @@ server:
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    root: INFO
+    com.gpis.marketplace_link: INFO
+    org.springframework.security: WARN
 
 springdoc:
   api-docs:
@@ -102,10 +102,3 @@ frontend:
 
 moderator:
   default-password: ${MODERATOR_DEFAULT_PASSWORD}
-
-# Azure Blob Storage Configuration
-azure:
-  storage:
-    connection-string: ${AZURE_STORAGE_CONNECTION_STRING}
-    container-name: ${AZURE_STORAGE_CONTAINER_NAME:imagenes}
-    enabled: ${AZURE_STORAGE_ENABLED:true}
